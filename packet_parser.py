@@ -55,8 +55,7 @@ class Packet:
         if op in data:
             self.name = data[op]
         else:
-            print(f"ERROR NO OPNAME FOR: {op}")
-            exit()
+            raise ValueError(f"No opname found for operation: {op}")
         rb = rb[4:]
 
         # data
@@ -81,6 +80,30 @@ class Packet:
         print_dict(self.name, self.payload)
         print("----------")
 
+    def log(self):
+        with open('log_v2.txt', 'a') as f:
+            f.write("\n------------------------------\n")
+            f.write(f"{self.name}\n")
+            f.write("-\n")
+            f.write(f"{list(self.ba)}\n")
+            f.write("-\n")
+            f.write(f"type   : {self.type}\n")
+            f.write(f"length : {self.length}\n")
+            f.write(f"hash   : {self.hash}\n")
+            f.write(f"count  : {self.count}\n")
+            f.write("-\n")
+            f.write("{\n")
+            for key, value in self.struct.items():
+                f.write(f"  {key}: {value}\n")
+            f.write("}\n")
+            f.write("-\n")
+            f.write("{\n")
+            for key, value in self.payload.items():
+                f.write(f"  {key}: {value}\n")
+            f.write("}\n")
+            f.write("------------------------------\n")
+
 
 packet = Packet(packet)
 packet.console_output()
+packet.log()

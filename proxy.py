@@ -1,3 +1,4 @@
+from packet_parser import Packet
 import asyncio
 import struct
 import socket
@@ -53,7 +54,10 @@ async def client_to_server(client_reader, server_writer, client_addr):
                 break
             server_writer.write(msg)
             await server_writer.drain()
-            print(f"\n-\n{client_addr}\n  client -> server: {msg}\n-")
+            packet = Packet(bytearray(msg))
+            packet.console_output()
+            packet.log()
+            # print(f"\n-\n{client_addr}\n  client -> server: {msg}\n-")
             # with open('log.txt', 'a') as f:
             #     f.write(f"{client_addr} 'sent': {list(msg)} \n-\n")
     finally:
@@ -67,7 +71,10 @@ async def server_to_client(server_reader, client_writer, client_addr):
                 break
             client_writer.write(msg)
             await client_writer.drain()
-            print(f"\n-\n{client_addr}\n  server -> client: {list(msg)}\n-")
+            packet = Packet(bytearray(msg))
+            packet.console_output()
+            packet.log()
+            # print(f"\n-\n{client_addr}\n  server -> client: {list(msg)}\n-")
             # with open('log.txt', 'a') as f:
             #     f.write(f"{client_addr} 'recieved': {list(msg)} \n-\n")
     finally:
