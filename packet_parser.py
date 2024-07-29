@@ -1,109 +1,77 @@
+
+"""IMPORTS"""
 from msg_parser import Msg
 from msg_parser import print_dict
 import struct
 import json
 
-packet = b'TOZ \x89\x00\x00\x00\xff\xff\xff\xff\x00\x89\x00\x00\x00\x9d\x92\x9d@\x00\x9d\x92\x9d@\x00\x7f\x00\x00\x00\xb3\xbfJ\xf2C\\\x8fpW\xf4\x1b\x00\xdc\xe2>m-\xef7n\xea\xdfHW\xfc\x93\xa9\xc3l\xe3^\x98\xe7\xb6\xae<h\x04\x1e\xeee\xb9\xc6E,qd\xfa\xe0T\x9fm\x0b\xbcA\xbe\xb6\x17\x03}\x08w\x8b\xdc\xeeW\xbe\xacQMt>2[\x9fF=\xfd=\xbas:q`*+\xa0~\xd5\xe9d\xaf\xab\xec\x00Q||E\x1b\x9d\x86\xab\xf4X\xfab\xb4\xa6\xc9\x8e\xac\x8d\xf6\xc7\xcc\x88y\xce\xa4:]fv\x1d\xf2\x95'
+with open('_names.json', 'r') as f:
+    names = json.load(f)
+
+with open('_structs.json', 'r') as f:
+    structs = json.load(f)
+
+
+"""MAIN CODE"""
 class Packet:
     """
-    f0 = complete or incomplete?
-    f1 = msg length
-    f2 = hash
-    f3 = count
-    f4 = opcode
-    f5 = msg
+    logging functionality for packet data
+    parses packet data with Msg class
     """
-    def __init__(self, ba) -> None:
-        self.ba = ba
-        self.type = ""
-        self.length = 0
-        self.hash = ""
-        self.count = 0
-        self.name = ""
-        self.struct = ""
-        self.payload = ""
-        self.parse()
+    def __init__(self, header_buffer, payload_buffer):
+        # params
+        self.header = header_buffer
+        self.payload_bytes = payload_buffer
 
-    def parse(self):
-
-        # is complete? (type)
-        rb = self.ba 
-        self.type = struct.unpack("!BBBB", rb[:4])
-        rb = rb[4:]
-
-        # length
-        self.length = struct.unpack("<I", rb[:4])[0]
-        rb = rb[4:]
-
-        # hash 
-        self.hash = struct.unpack("!BBBB", rb[:4])
-        rb = rb[4:]
-
-        # nb
-        null_byte = rb[:1]
-        rb = rb[1:]
-
-        # count
-        self.count = struct.unpack("<I", rb[:4])[0]
-        rb = rb[4:]
-
-        # opcode
-        op = struct.unpack("<I", rb[:4])[0]
-        with open("_names.json", 'r') as f:
-            data = json.load(f)
-        op = str(op)
-        if op in data:
-            self.name = data[op]
+        # parse payload 
+        # msg = Msg(self.payload_bytes)
+        if self.header["name"] == "unknown":
+            structure = "unknown"
         else:
-            raise ValueError(f"No opname found for operation: {op}")
-        rb = rb[4:]
+            structure = structs[self.header["name"]]
+        self.payload = {
+            "bytes": list(self.payload_bytes),
+            "struct": structure,
+            # "msg": msg.msg,
+            # "rest": msg.rb 
+        }
 
-        # data
-        print(list(bytearray(rb)))
-        msg = Msg(rb)
-        self.struct = msg.struct
-        self.payload = msg.msg
-
-    def console_output(self):
-        print("\n----------")
-        print(f"{self.name}")
-        print("-")
-        print(f"{list(self.ba)}")
-        print("-")
-        print(f"type   : {self.type}")
-        print(f"length : {self.length}")
-        print(f"hash   : {self.hash}")
-        print(f"count  : {self.count}")
-        print("-")
-        print_dict(self.name, self.struct)
-        print("-")
-        print_dict(self.name, self.payload)
-        print("----------")
+        # combine packet data
+        self.packet_data = {
+            self.header["name"]: {
+                "header": self.header,
+                "payload": self.payload
+            }
+        }
 
     def log(self):
-        with open('log_v2.txt', 'a') as f:
-            f.write("\n------------------------------\n")
-            f.write(f"{self.name}\n")
-            f.write("-\n")
-            f.write(f"{list(self.ba)}\n")
-            f.write("-\n")
-            f.write(f"type   : {self.type}\n")
-            f.write(f"length : {self.length}\n")
-            f.write(f"hash   : {self.hash}\n")
-            f.write(f"count  : {self.count}\n")
-            f.write("-\n")
-            f.write("{\n")
-            for key, value in self.struct.items():
-                f.write(f"  {key}: {value}\n")
-            f.write("}\n")
-            f.write("-\n")
-            f.write("{\n")
-            for key, value in self.payload.items():
-                f.write(f"  {key}: {value}\n")
-            f.write("}\n")
-            f.write("------------------------------\n")
+        self.print_to_console()
+        self.write_to_file()
 
+    def print_to_console(self):
+        json.dumps(self.packet_data, indent=2)
+        # print("\n--------------")
+        # print("HEADER:")
+        # for k, v in self.header.items():  
+        #     print(f"    {k:<7}: {v}")
+        # print("-")
+        # print("PAYLOAD")
+        # for k, v in self.header.items():  
+        #     print(f"    {k:<7}: {v}")
+        # print("-")
 
-packet = Packet(packet)
-packet.console_output()
-packet.log()
+    def write_to_file(self):
+        # self.payload["rest"] != []
+        if self.header["name"] == "unknown":
+            with open('error_log.json') as f:
+                json.dump(self.packet_data, f, indent=2)
+                f.write(',\n') 
+
+        # add packet data to main log
+        with open('log.json', 'a') as f:
+            json.dump(self.packet_data, f, indent=2)
+            f.write(',\n') 
+
+    
+
+            

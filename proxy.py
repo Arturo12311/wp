@@ -1,8 +1,16 @@
+
+"""HELPERS"""
 from packet_parser import Packet
 import asyncio
 import struct
 import socket
+import json
 
+with open('_names.json', 'r') as f:
+    names = json.load(f)
+
+
+"""PROXY"""
 async def handle_client(client_reader, client_writer):
     """
     1. completes handshakes
@@ -40,52 +48,95 @@ async def handle_client(client_reader, client_writer):
     # convo
     print(f"-\n{client_addr}\nCONVO BEGIN\n-")
     await asyncio.gather(
-        client_to_server(client_reader, server_writer, client_addr),
-        server_to_client(server_reader, client_writer, client_addr)
+        client_to_server(client_reader, server_writer),
+        server_to_client(server_reader, client_writer)
     )
     print(f"-\n{client_addr}\nCONVO END\n-")
 
 
-async def client_to_server(client_reader, server_writer, client_addr):
+async def client_to_server(client_reader, server_writer):
     try:
         while True:
-            msg = await client_reader.read(8192)
-            if not msg:
+            # read header
+            header_bytes = await client_reader.readexactly(21)
+            if not header_bytes:
                 break
-            server_writer.write(msg)
+            header = read_header(header_bytes, "send")
+
+            # read payload
+            payload_bytes = await client_reader.readexactly(header["length"])
+
+            # send header and payload to server
+            server_writer.write(header_bytes + payload_bytes)
             await server_writer.drain()
-            packet = Packet(bytearray(msg))
-            packet.console_output()
+
+            # log packet
+            adjusted_payload = b'\x00' + header_bytes[17:21] + payload_bytes
+            packet = Packet(header, adjusted_payload)
             packet.log()
-            # print(f"\n-\n{client_addr}\n  client -> server: {msg}\n-")
-            # with open('log.txt', 'a') as f:
-            #     f.write(f"{client_addr} 'sent': {list(msg)} \n-\n")
     finally:
         server_writer.close()
 
-async def server_to_client(server_reader, client_writer, client_addr):
+async def server_to_client(server_reader, client_writer):
     try:
+        header = {}
+        payload_bytes = b''
         while True:
-            msg = await server_reader.read(8192)
-            if not msg:
+
+            # read header
+            header_bytes = await server_reader.readexactly(21)
+            if not header_bytes:
                 break
-            client_writer.write(msg)
+            header = read_header(header_bytes, "recv")
+
+            # read payload
+            payload_bytes = await server_reader.readexactly(header["length"])
+
+            # send header and payload to server
+            client_writer.write(header_bytes + payload_bytes)
             await client_writer.drain()
-            packet = Packet(bytearray(msg))
-            packet.console_output()
+
+            # log packet
+            adjusted_payload = b'\x00' + header_bytes[17:21] + payload_bytes
+            packet = Packet(header, adjusted_payload)
             packet.log()
-            # print(f"\n-\n{client_addr}\n  server -> client: {list(msg)}\n-")
-            # with open('log.txt', 'a') as f:
-            #     f.write(f"{client_addr} 'recieved': {list(msg)} \n-\n")
     finally:
         client_writer.close()
+
+
+def read_header(b, type):
+    op = struct.unpack("<I", b[17:21])[0]
+    if str(op) not in names:
+        header = {
+            "type": type,
+            "length": struct.unpack("<I", b[4:8])[0],
+            "hash": struct.unpack("!BBBB", b[8:12]),
+            "count": struct.unpack("<I", b[13:17])[0],
+            "name": "unknown"
+        }
+        # print("\n\n\n\n----------------------------")
+        # print("ERROR: no name found in opcode names")
+        # print("-")
+        # print(f"packet bytes: {list(b)}")
+        # print("-")
+        # print(f"packet op[17:21]: {op}")
+        # exit()
+        
+    header = {
+        "type": type,
+        "length": struct.unpack("<I", b[4:8])[0],
+        "hash": struct.unpack("!BBBB", b[8:12]),
+        "count": struct.unpack("<I", b[13:17])[0],
+        "name": names[str(struct.unpack("<I", b[17:21])[0])]
+    }
+    return header
     
 
 async def start_proxy():   
     """
     initiates the proxy and makes it listen forever
     """
-    proxy = await asyncio.start_server(handle_client, '192.168.2.19', 8888)
+    proxy = await asyncio.start_server(handle_client, '192.168.2.145', 8888)
     async with proxy:
         print("PROXY INITIATED")
         await proxy.serve_forever()
