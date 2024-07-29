@@ -26,7 +26,7 @@ async def handle_client(client_reader, client_writer):
     print(f"-\n{client_addr}\n  handshake msg2 (client -> proxy): {x}")
     host = socket.inet_ntoa(x[4:8])
     port = struct.unpack("!H", x[8:10])[0]
-    print(f"  extracted server info:\n    host: {host}\n  port: {port}")
+    print(f"  extracted server info:\n    host: {host}\n    port: {port}")
 
     server_reader, server_writer = await asyncio.open_connection(host, port)
     print(f"  CONNECTED TO SERVER!\n-")
@@ -53,9 +53,9 @@ async def client_to_server(client_reader, server_writer, client_addr):
                 break
             server_writer.write(msg)
             await server_writer.drain()
-            print(f"\n-\n{client_addr}\n  client -> server: {list(msg)}\n-")
-            with open('log.txt', 'a') as f:
-                f.write(f"{client_addr} 'sent': {list(msg)} \n-\n")
+            print(f"\n-\n{client_addr}\n  client -> server: {msg}\n-")
+            # with open('log.txt', 'a') as f:
+            #     f.write(f"{client_addr} 'sent': {list(msg)} \n-\n")
     finally:
         server_writer.close()
 
@@ -68,10 +68,11 @@ async def server_to_client(server_reader, client_writer, client_addr):
             client_writer.write(msg)
             await client_writer.drain()
             print(f"\n-\n{client_addr}\n  server -> client: {list(msg)}\n-")
-            with open('log.txt', 'a') as f:
-                f.write(f"{client_addr} 'recieved': {list(msg)} \n-\n")
+            # with open('log.txt', 'a') as f:
+            #     f.write(f"{client_addr} 'recieved': {list(msg)} \n-\n")
     finally:
         client_writer.close()
+    
 
 async def start_proxy():   
     """
