@@ -97,8 +97,7 @@ async def server_to_client(server_reader, client_writer):
             await client_writer.drain()
 
             # log packet
-            adjusted_payload = b'\x00' + header_bytes[17:21] + payload_bytes
-            packet = Packet(header, adjusted_payload)
+            packet = Packet(header, payload_bytes)
             packet.log()
     finally:
         client_writer.close()
@@ -125,7 +124,7 @@ def read_header(b, type):
     header = {
         "type": type,
         "length": struct.unpack("<I", b[4:8])[0],
-        "hash": struct.unpack("!BBBB", b[8:12]),
+        "hash": ','.join(map(str, struct.unpack("!BBBB", b[8:12]))),
         "count": struct.unpack("<I", b[13:17])[0],
         "name": names[str(struct.unpack("<I", b[17:21])[0])]
     }

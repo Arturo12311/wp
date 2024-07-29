@@ -30,7 +30,7 @@ class Packet:
         else:
             structure = structs[self.header["name"]]
         self.payload = {
-            "bytes": list(self.payload_bytes),
+            "bytes": ','.join(map(str, list(self.payload_bytes))),
             "struct": structure,
             # "msg": msg.msg,
             # "rest": msg.rb 
@@ -49,16 +49,15 @@ class Packet:
         self.write_to_file()
 
     def print_to_console(self):
-        json.dumps(self.packet_data, indent=2)
-        # print("\n--------------")
-        # print("HEADER:")
-        # for k, v in self.header.items():  
-        #     print(f"    {k:<7}: {v}")
-        # print("-")
-        # print("PAYLOAD")
-        # for k, v in self.header.items():  
-        #     print(f"    {k:<7}: {v}")
-        # print("-")
+        print("\n--------------")
+        print("HEADER:")
+        for k, v in self.header.items():  
+            print(f"    {k:<8}: {v}")
+        print("-")
+        print("PAYLOAD")
+        for k, v in self.payload.items():  
+            print(f"    {k:<8}: {v}")
+        print("-")
 
     def write_to_file(self):
         # self.payload["rest"] != []
@@ -68,9 +67,16 @@ class Packet:
                 f.write(',\n') 
 
         # add packet data to main log
-        with open('log.json', 'a') as f:
-            json.dump(self.packet_data, f, indent=2)
-            f.write(',\n') 
+        with open('log.txt', 'a') as f:
+            f.write("\n-----------------------\n")
+            f.write("HEADER:\n")
+            for k, v in self.header.items():  
+                f.write(f"    {k:<8}: {v}\n")
+            f.write("-\n")
+            f.write("PAYLOAD\n")
+            for k, v in self.payload.items():  
+                f.write(f"    {k:<8}: {v}\n")
+            print("-\n")
 
     
 
