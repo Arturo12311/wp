@@ -26,61 +26,88 @@ class Client:
             - deserialize -> packet object -> serialize 
     )
     """
-    def __init__(self, client_reader, client_writer):
+    def __init__(self, client_reader, client_writer): 
+        # client info
+        self.client_addr = client_writer.get_extra_info('peername')
         self.client_reader = client_reader
         self.client_writer = client_writer
-        self.server_writer = None
+
+        # server info
+        self.server_addr = None
         self.server_reader = None
+        self.server_writer = None
+
+        # tls info
+        self.client_tls_key = None
+        self.server_tls_key = None
 
 
     async def handle_client(self):
-        # SOCK5 handshake
-        await self.SOCK5_handshake()
-        print("\nsock5 handshake complete")
+        # proxify handshake 
+        await self.complete_proxify_handshake(self.client_reader, self.client_writer)
+        print("\n---")
+        print("PROXIFY HANDSHAKE COMPLETE")
+        print(f"  client address = {self.client_addr}")
+        print(f"  server address = {self.server_addr}")
+        print("---\n")
 
-        # TLS config
-        
+        # tls handshakes
+        await self.client_tls_handshake()
+        await self.server_tls_handshake()
+        print("\n---")
+        print("TLS HANDSHAKES COMPLETE")
+        print(f"  client_tls_key = {self.client_tls_key}")
+        print(f"  server_tls_key = {self.server_tls_key}")
+        print("---\n")
 
-
-        # manage convo
+        # manage tls connection
         await asyncio.gather(
-            self.client_to_server(),
-            self.server_to_client()
+            self.manage_tls_connection(endpoint="client"),
+            self.manage_tls_connection(endpoint="server")
         )
 
 
-    async def SOCK5_handshake(self):
-        # client connection info
-        client_addr = self.client_writer.get_extra_info('peername')
-        print(f"\nCLIENT CONNECTED {client_addr}")
-
+    async def complete_proxify_handshake(self, client_reader, client_writer):
         # msg1
-        await self.client_reader.read(3)
-
+        await client_reader.read(3)
         # reply1
-        self.client_writer.write(b'\x05\x00')
-        await self.client_writer.drain()
-
+        client_writer.write(b'\x05\x00')
+        await client_writer.drain()
         # msg2
         msg2 = await self.client_reader.read(10)
         server_host = inet_ntoa(msg2[4:8])
         server_port = unpack("!H", msg2[8:10])[0]
-        # server connection info
-        self.server_reader, self.server_writer = await asyncio.open_connection(server_host, server_port) 
-        server_addr = self.server_writer.get_extra_info('peername')
-        print(f"\nCONNECTED TO SERVER {server_addr}")
-
+        server_addr = (server_host, server_port)
+        server_reader, server_writer = await asyncio.open_connection(server_addr)
         # reply2
-        self.client_writer.write(b'\x05\x00\x00\x01' + msg2[4:10])
-        await self.client_writer.drain()
-    
+        client_writer.write(b'\x05\x00\x00\x01' + msg2[4:10])
+        await client_writer.drain()
 
-    async def perform_tls_handshake_as_server(self, client_writer):
-        pass  # Define the async TLS handshake function
+        # update class variables
+        self.server_addr = server_addr
+        self.server_reader = server_reader
+        self.server_writer = server_writer
 
 
-    async def perform_tls_handshake_as_client(self, server_address, server_port):
-        pass  # Define the async TLS handshake function
+    async def client_tls_handshake(self):
+        # msg1
+        ## reply1
+        # msg2
+        # #reply2
+        pass
+
+    async def server_tls_handshake(self):
+        ## msg1
+        # reply1
+        ## msg2
+        # reply2
+        pass
+
+
+
+
+    async def manage_tls_connection(self, endpoint):
+        pass
 
 
 
