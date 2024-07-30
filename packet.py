@@ -1,4 +1,10 @@
 
+"""
+todo:
+    implement packet parsing 
+    add start and end points in output
+"""
+
 # from msg import Msg
 from struct import unpack
 import json
