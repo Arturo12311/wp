@@ -1,21 +1,18 @@
+import asyncio
+from connection import Connection
+PROXY_HOST = '192.168.2.145'
+PROXY_PORT = 8888
+
+async def handle_client(reader, writer):
+    connection = Connection(reader, writer, PROXY_HOST, PROXY_PORT)
+    await connection.start()
+    await writer.close()
 
 async def start_proxy():
-    from connection import Connection
-    from asyncio    import start_server
-
-    proxy_host = '192.168.2.145'
-    proxy_port = 8888
-    proxy      = await start_server(
-                                    lambda r, w: Connection(r, w, proxy_host, proxy_port).start(), 
-                                    proxy_host, proxy_port
-                                    ) 
+    proxy = await asyncio.start_server(handle_client, PROXY_HOST, PROXY_PORT)
     async with proxy:
-        # print("PROXY INITIATED")
+        print("PROXY INITIATED")
         await proxy.serve_forever()
 
-# run
-from asyncio import run
-run(start_proxy())
-
-
-
+if __name__ == "__main__":
+    asyncio.run(start_proxy())

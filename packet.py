@@ -16,15 +16,15 @@ class Packet:
     """
     extracts, logs, and potentially modifies packet data
     """
-    def __init__(self, header_bytes, payload_bytes, operation):
+    def __init__(self, header_bytes, payload_bytes):
         # header data
-        self.header_data = self.read_header(header_bytes, operation)
+        self.header_data = self.read_header(header_bytes)
 
         # payload data
         self.payload_data = self.read_payload(payload_bytes)
 
 
-    def read_header(self, header_bytes, operation):
+    def read_header(self, header_bytes):
         # import names file 
         full_path = os.path.join(CURRENT_DIR, "assets/names.json")
         with open(full_path, 'r') as f:
@@ -37,7 +37,6 @@ class Packet:
                 "name": "unknown",
                 "op": op,
                 "bytes": list(header_bytes),
-                "type": operation,
                 "length": unpack("<I", header_bytes[4:8])[0],
                 "hash": unpack("!BBBB", header_bytes[8:12]),
                 "count": unpack("<I", header_bytes[13:17])[0]
@@ -47,7 +46,6 @@ class Packet:
         # regular header data
         header_data = {
             "name": names[str(unpack("<I", header_bytes[17:21])[0])],
-            "type": operation,
             "length": unpack("<I", header_bytes[4:8])[0],
             "hash": list(unpack("!BBBB", header_bytes[8:12])),
             "count": unpack("<I", header_bytes[13:17])[0]
@@ -115,14 +113,14 @@ class Packet:
 
         # noname
         if self.header_data["name"] == "unknown":
-            _write("log/er_nonames.txt")
+            _write("logs/er_nonames.txt")
 
         # remainder
         # if self.payload_data["rest"] != []:
-        #     _write("log/er_remainder.txt")
+        #     _write("logs/er_remainder.txt")
 
         # regular
-        _write("log/log.txt")
+        _write("logs/log.txt")
 
     
 
