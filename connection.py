@@ -174,26 +174,18 @@ class Connection:
 
     #HELPERS#
     def rsa_decrypt(self, encrypted, private_key):
-        try:
-            decrypted = private_key.decrypt(
+        decrypted = private_key.decrypt(
                 encrypted,
                 padding.PKCS1v15()
             )
-            return decrypted
-        except Exception as e:
-            print(f"Decryption error: {e}")
-            raise
+        return decrypted
 
     def rsa_encrypt(self, data, public_key):
-        try:
-            encrypted = public_key.encrypt(
+        encrypted = public_key.encrypt(
                 data,
                 padding.PKCS1v15()
             )
-            return encrypted
-        except Exception as e:
-            print(f"Encryption error: {e}")
-            raise
+        return encrypted
    
     def gen_master_key(self, client_random_bytes, server_random_bytes, clientkey):
         master_secret = b"master secret"
