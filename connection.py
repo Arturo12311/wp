@@ -80,8 +80,6 @@ class Connection:
     
     async def read_message(self, reader):       
         header = await reader.readexactly(21)
-        if header is None: 
-            return None 
         length  = unpack("<I", header[4:8])[0]
         payload = await reader.readexactly(length)
         return header, payload
@@ -202,9 +200,12 @@ class Connection:
         await gather(client_to_server, server_to_client) #start 
 
     async def transfer_message(self, reader, writer):
-        header, payload = await self.read_message(reader) #read
-        await self.intercept(header, payload)             #intercept
-        await self.write_message(writer, header, payload) #write
+        while True:
+            header, payload = await self.read_message(reader)
+            if header is None:
+                break  
+            await self.intercept(header, payload)
+            await self.write_message(writer, header, payload)
 
 
 
