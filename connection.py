@@ -96,12 +96,6 @@ class Connection:
         await writer.drain()
     
     def intercept(self, header, payload):
-        if header is None:
-            print("Received None header")
-            return
-        if payload is None:
-            print("Received None payload")
-            return
         packet = Packet(header, payload)
         packet.print_to_console()
         packet.write_to_file()
@@ -111,7 +105,6 @@ class Connection:
     async def complete_proxify_handshake(self):
         # client -> proxy
         x = await self.client["reader"].read(3)
-        print(f"{x}")
 
         # proxy -> client
         self.client["writer"].write(b'\x05\x00')
