@@ -120,7 +120,7 @@ class Packet:
         #     _write("logs/er_remainder.txt")
 
         # regular
-        _write("logs/log.txt")
+        # _write("logs/log.txt")
 
     
 

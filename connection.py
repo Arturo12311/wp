@@ -1,4 +1,6 @@
-from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.primitives.asymmetric import padding as asymmetric_padding
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes
@@ -18,7 +20,6 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 """CONNECTION CLASS"""
 class Connection:
     def __init__(self, client_reader, client_writer, proxy_host, proxy_port):
-        self.client_writer = client_writer
 
         self.proxy = {
                       "host"       : proxy_host,
@@ -84,7 +85,7 @@ class Connection:
         print("---\n")
     
     async def read_message(self, reader):   
-        header = await reader.readexactly(21)
+        header = await reader.read(21)
         if not header:
             return None, None
         length = unpack("<I", header[4:8])[0]
@@ -95,10 +96,20 @@ class Connection:
         writer.write(header + payload)
         await writer.drain()
     
-    def intercept(self, header, payload):
+    def intercept(self, header, payload, decrypt=False):
+        if decrypt == True:
+            payload = self.decrypt_payload(payload)
         packet = Packet(header, payload)
         packet.print_to_console()
         packet.write_to_file()
+    
+    def decrypt_payload(self, payload):
+        cipher = Cipher(algorithms.AES(self.proxy["master_key"]), modes.CBC(self.proxy["iv"]), backend=default_backend())
+        decryptor = cipher.decryptor()
+        padded_plaintext = decryptor.update(payload) + decryptor.finalize()
+        unpadder = padding.PKCS7(algorithms.AES.block_size).unpadder()
+        plaintext = unpadder.update(padded_plaintext) + unpadder.finalize()
+        return plaintext
 
 
     """PROXIFY HANDSHAKE"""
@@ -176,14 +187,14 @@ class Connection:
     def rsa_decrypt(self, encrypted, private_key):
         decrypted = private_key.decrypt(
                 encrypted,
-                padding.PKCS1v15()
+                asymmetric_padding.PKCS1v15()
             )
         return decrypted
 
     def rsa_encrypt(self, data, public_key):
         encrypted = public_key.encrypt(
                 data,
-                padding.PKCS1v15()
+                asymmetric_padding.PKCS1v15()
             )
         return encrypted
    
@@ -215,7 +226,7 @@ class Connection:
             header, payload = await self.read_message(reader)
             if header is None:
                 break  
-            self.intercept(header, payload)
+            self.intercept(header, payload, decrypt=True)
             await self.write_message(writer, header, payload)
 
 
