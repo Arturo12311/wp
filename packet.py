@@ -22,7 +22,9 @@ class Packet:
     """
     extracts, logs, and potentially modifies packet data
     """
-    def __init__(self, header_bytes, payload_bytes):
+    def __init__(self, header_bytes, payload_bytes, type, port):
+        self.type = type
+        self.port = port
         # header data
         self.header_data = self.read_header(header_bytes)
 
@@ -40,6 +42,7 @@ class Packet:
             header_data = {
                 "name": "unknown",
                 "op": op,
+                "type": self.type,
                 "bytes": list(header_bytes),
                 "length": unpack("<I", header_bytes[4:8])[0],
                 "hash": unpack("!BBBB", header_bytes[8:12]),
@@ -50,6 +53,7 @@ class Packet:
         # regular header data
         header_data = {
             "name": names[str(unpack("<I", header_bytes[17:21])[0])],
+            "type": self.type,
             "length": unpack("<I", header_bytes[4:8])[0],
             "hash": list(unpack("!BBBB", header_bytes[8:12])),
             "count": unpack("<I", header_bytes[13:17])[0]
@@ -73,15 +77,15 @@ class Packet:
             # "rest": msg.rb 
         }
         return payload_data
-    
-    async def print_to_console(self, direction):
-        # Use asyncio.get_event_loop().run_in_executor for potentially blocking operations
-        await asyncio.get_event_loop().run_in_executor(None, self._print_to_console, direction)
 
-    def _print_to_console(self, direction):
-        # print endpoints
+    """LOGGING"""
+    async def print_to_console(self):
+        # Use asyncio.get_event_loop().run_in_executor for potentially blocking operations
+        await asyncio.get_event_loop().run_in_executor(None, self._print_to_console)
+
+    def _print_to_console(self):
         print("\n--------------")
-        if direction != False: print(direction)
+        print(self.port)
         print("-")
 
         # print header data
@@ -96,23 +100,20 @@ class Packet:
             print(f"    {k:<8}: {v}")
         print("-")
 
-    async def write_to_file(self, direction):
+    async def write_to_file(self, filename):
         # Use asyncio.get_event_loop().run_in_executor for file I/O
-        await asyncio.get_event_loop().run_in_executor(None, self._write_to_file, direction)
+        await asyncio.get_event_loop().run_in_executor(None, self._write_to_file, filename)
 
-    def _write_to_file(self, direction):
+    def _write_to_file(self, filename):
         def _write(path):
             # open file
             full_path = os.path.join(CURRENT_DIR, path)
             os.makedirs(os.path.dirname(full_path), exist_ok=True)
             with open(full_path, 'a') as f:
-                # write endpoints
-                f.write("\n-----------------------\n")
-                if direction != False: f.write(direction)
-                f.write("\n-\n")
-
-
                 # write header_data
+                f.write("\n-----------------------\n")
+                f.write(f"port: {self.port}\n")
+                f.write("-\n")
                 f.write("HEADER:\n")
                 for k, v in self.header_data.items():  
                     f.write(f"    {k:<8}: {v}\n")
@@ -133,7 +134,7 @@ class Packet:
         #     _write("logs/er_remainder.txt")
 
         # regular
-        _write("logs/log.txt")
+        _write(f"logs/{filename}")
 
     
 

@@ -16,6 +16,10 @@ import hmac
 import os 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
+filter_list = [
+    
+]
+
 
 """CONNECTION CLASS"""
 class Connection:
@@ -43,59 +47,87 @@ class Connection:
                        "host"       : None,
                        "port"       : None,
                        }
+    
+    # called by proxy
+    async def start(self):
+        try:
+            await self.complete_proxify_handshake()
+            await self.complete_tls_handshake()
+            await self.manage_conversation()
+        except Exception as e:
+            print(f"Error occurred: {str(e)}")
+            exit(1)
         
+
     """CONVERSATION"""
     async def manage_conversation(self):     
         # listeners
-        client_to_server = create_task(self.transfer_message(self.client["reader"], self.server["writer"]))
-        server_to_client = create_task(self.transfer_message(self.server["reader"], self.client["writer"]))
+        client_to_server = create_task(self.communication_stream(self.client["reader"], self.server["writer"], "send"))
+        server_to_client = create_task(self.communication_stream(self.server["reader"], self.client["writer"], "recv"))
         await gather(client_to_server, server_to_client) #start 
 
-    async def transfer_message(self, reader, writer):
-        while True:
-            header, payload = await self.read_message(reader)
-            if header is None:
-                break  
-            await self.write_message(writer, header, payload)
-            if reader == self.client["reader"]:
-                direction = "client -> server" 
-            else:
-                direction = "server -> client"
-            await self.intercept(header, payload, direction)
-        
-        writer.close()
-        await writer.wait_closed()
+    async def communication_stream(self, reader, writer, type):
+        try:
+            while True:
+                # read
+                try:
+                    header, payload = await self.read_message(reader)
+                except IncompleteReadError:
+                    break
+                # intercept
+                await self.intercept(header, payload, type)
+                # write
+                await self.write_message(writer, header, payload)
+        finally:
+            # cleanup
+            writer.close()
+            await writer.wait_closed()
     
     async def read_message(self, reader):
         try:
-            header = await reader.read(21)
-            if not header:
-                return None, None
+            # header
+            header = await reader.readexactly(21)
+            # payload
             length = unpack("<I", header[4:8])[0]
             payload = await reader.readexactly(length)
+            # return message
             return header, payload
-        except (ConnectionResetError) as e:
-            print(f"Connection error while reading message: {e}")
-            return None, None
+        # marks end of stream
+        except IncompleteReadError:
+            raise
                 
     async def write_message(self, writer, header, payload):
-        writer.write(header + payload)
-        await writer.drain()
+        try:
+            writer.write(header + payload)
+            await writer.drain()  # ensure entire message sent
+        except Exception as e:
+            print(f"Error writing message: {str(e)}")
+            raise
     
-    async def intercept(self, header, payload, direction=False, decrypt=False):
-        if decrypt == True:
+    async def intercept(self, header, payload, type):
+        try:
+            # get packet info
             payload = self.decrypt_payload(payload)
-        packet = Packet(header, payload)
-        await packet.print_to_console(direction)
-        await packet.write_to_file(direction)
+            packet = Packet(header, payload, type, self.client["port"])
+            # filter
+            if packet.header_data["name"] not in filter_list:
+                await packet.print_to_console()
+                # await packet.write_to_file("log.txt")
+        except Exception as e:
+            print(f"Error intercepting packet: {str(e)}")
+            raise
     
     def decrypt_payload(self, payload):
-        cipher = Cipher(algorithms.AES(self.proxy["master_key"]), modes.CBC(self.proxy["iv"]), backend=default_backend())
-        decryptor = cipher.decryptor()
-        padded_plaintext = decryptor.update(payload) + decryptor.finalize()
-        unpadder = padding.PKCS7(algorithms.AES.block_size).unpadder()
-        plaintext = unpadder.update(padded_plaintext) + unpadder.finalize()
-        return plaintext
+        try:
+            cipher = Cipher(algorithms.AES(self.proxy["master_key"]), modes.CBC(self.proxy["iv"]), backend=default_backend())
+            decryptor = cipher.decryptor()
+            padded_plaintext = decryptor.update(payload) + decryptor.finalize()
+            unpadder = padding.PKCS7(algorithms.AES.block_size).unpadder()
+            plaintext = unpadder.update(padded_plaintext) + unpadder.finalize()
+            return plaintext
+        except Exception as e:
+            print(f"Error decrypting payload: {str(e)}")
+            raise
 
 
     """PROXIFY HANDSHAKE"""
@@ -124,13 +156,11 @@ class Connection:
     async def complete_tls_handshake(self):
         # client -> server
         header, payload = await self.read_message(self.client["reader"]) #read
-        await self.intercept(header, payload)                             #intercept
         client_random_bytes = payload[10:]                               
         await self.write_message(self.server["writer"], header, payload) #write
 
         # server -> client
         header, payload = await self.read_message(self.server["reader"])  # read
-        await self.intercept(header, payload)                              # intercept
         # randoms
         server_random_bytes = payload[10:-269]
         # server key
@@ -149,7 +179,6 @@ class Connection:
 
         # client -> server
         header, payload = await self.read_message(self.client["reader"]) #read
-        await self.intercept(header, payload)                            #intercept
         decrypted_secret   = self.rsa_decrypt(                           
                                               payload[10:], 
                                               self.proxy["private_key"]
@@ -168,7 +197,6 @@ class Connection:
 
         # server -> client
         header, payload = await self.read_message(self.server["reader"]) #read 
-        await self.intercept(header, payload)                            #intercept 
         await self.write_message(self.client["writer"], header, payload) #write
 
     def rsa_decrypt(self, encrypted, private_key):
@@ -219,29 +247,3 @@ class Connection:
                 )
             return private_key
     
-    async def start(self):
-        complete = await self.complete_proxify_handshake()
-        if complete == False:
-            return
-        print("\n---")
-        print("PROXIFY HANDSHAKE COMPLETE")
-        print(f"  client address = {self.client['host'], self.client['port']}")
-        print(f"  server address = {self.server['host'], self.server['port']}")
-        print("---\n")
-
-        await self.complete_tls_handshake()
-        print("\n---")
-        print("TLS HANDSHAKE COMPLETE")
-        print(f"  client address = {self.client['host'], self.client['port']}")
-        print(f"  server address = {self.server['host'], self.server['port']}")
-        print("---\n")
-
-        await self.manage_conversation()
-        print("CONVERSATION ENDED")
-        print(f"  client address = {self.client['host'], self.client['port']}")
-        print(f"  server address = {self.server['host'], self.server['port']}")
-        print("---\n")
-
-
-
-
