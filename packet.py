@@ -9,7 +9,13 @@ todo:
 from struct import unpack
 from json import load
 import os
+import asyncio
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+with open(os.path.join(CURRENT_DIR, "assets/names.json"), 'r') as f:
+    names = load(f)
+with open(os.path.join(CURRENT_DIR, "assets/structs.json"), 'r') as f:
+    structs = load(f)
 
 """PACKET CLASS"""
 class Packet:
@@ -27,8 +33,6 @@ class Packet:
     def read_header(self, header_bytes):
         # import names file 
         full_path = os.path.join(CURRENT_DIR, "assets/names.json")
-        with open(full_path, 'r') as f:
-            names = load(f)
 
         # header data if noname
         op = unpack("<I", header_bytes[17:21])[0]
@@ -56,8 +60,6 @@ class Packet:
     def read_payload(self, payload_bytes):
         # import structures file
         full_path = os.path.join(CURRENT_DIR, "assets/structs.json")
-        with open(full_path, 'r') as f:
-            structs = load(f)
 
         # get struct
         name = self.header_data["name"]
@@ -71,11 +73,16 @@ class Packet:
             # "rest": msg.rb 
         }
         return payload_data
+    
+    async def print_to_console(self, direction):
+        # Use asyncio.get_event_loop().run_in_executor for potentially blocking operations
+        await asyncio.get_event_loop().run_in_executor(None, self._print_to_console, direction)
 
-
-    def print_to_console(self):
+    def _print_to_console(self, direction):
         # print endpoints
         print("\n--------------")
+        if direction != False: print(direction)
+        print("-")
 
         # print header data
         print("HEADER:")
@@ -89,8 +96,11 @@ class Packet:
             print(f"    {k:<8}: {v}")
         print("-")
 
+    async def write_to_file(self, direction):
+        # Use asyncio.get_event_loop().run_in_executor for file I/O
+        await asyncio.get_event_loop().run_in_executor(None, self._write_to_file, direction)
 
-    def write_to_file(self):
+    def _write_to_file(self, direction):
         def _write(path):
             # open file
             full_path = os.path.join(CURRENT_DIR, path)
@@ -98,6 +108,9 @@ class Packet:
             with open(full_path, 'a') as f:
                 # write endpoints
                 f.write("\n-----------------------\n")
+                if direction != False: f.write(direction)
+                f.write("\n-\n")
+
 
                 # write header_data
                 f.write("HEADER:\n")
@@ -120,7 +133,7 @@ class Packet:
         #     _write("logs/er_remainder.txt")
 
         # regular
-        # _write("logs/log.txt")
+        _write("logs/log.txt")
 
     
 

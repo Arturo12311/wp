@@ -6,7 +6,7 @@ PROXY_PORT = 8888
 async def handle_client(reader, writer):
     connection = Connection(reader, writer, PROXY_HOST, PROXY_PORT)
     await connection.start()
-    await writer.close()
+    writer.close()
 
 async def start_proxy():
     proxy = await asyncio.start_server(handle_client, PROXY_HOST, PROXY_PORT)

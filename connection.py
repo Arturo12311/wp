@@ -44,64 +44,50 @@ class Connection:
                        "port"       : None,
                        }
         
+    """CONVERSATION"""
+    async def manage_conversation(self):     
+        # listeners
+        client_to_server = create_task(self.transfer_message(self.client["reader"], self.server["writer"]))
+        server_to_client = create_task(self.transfer_message(self.server["reader"], self.client["writer"]))
+        await gather(client_to_server, server_to_client) #start 
 
-    """HELPERS"""
-    def import_RSA_key(self, x):
-        if x == "public":
-            full_path = os.path.join(CURRENT_DIR, 'keys/public_key.pem')
-            with open(full_path, "rb") as key_file:
-                public_key = serialization.load_pem_public_key(
-                    key_file.read()
-                )
-            return public_key
-        elif x == "private":
-            full_path = os.path.join(CURRENT_DIR, 'keys/private_key.pem')
-            with open(full_path, "rb") as key_file:
-                private_key = serialization.load_pem_private_key(
-                    key_file.read(),
-                    password=None  
-                )
-            return private_key
+    async def transfer_message(self, reader, writer):
+        while True:
+            header, payload = await self.read_message(reader)
+            if header is None:
+                break  
+            await self.write_message(writer, header, payload)
+            if reader == self.client["reader"]:
+                direction = "client -> server" 
+            else:
+                direction = "server -> client"
+            await self.intercept(header, payload, direction)
+        
+        writer.close()
+        await writer.wait_closed()
     
-    async def start(self):
-        await self.complete_proxify_handshake()
-        print("\n---")
-        print("PROXIFY HANDSHAKE COMPLETE")
-        print(f"  client address = {self.client['host'], self.client['port']}")
-        print(f"  server address = {self.server['host'], self.server['port']}")
-        print("---\n")
-
-        await self.complete_tls_handshake()
-        print("\n---")
-        print("TLS HANDSHAKE COMPLETE")
-        print(f"  client address = {self.client['host'], self.client['port']}")
-        print(f"  server address = {self.server['host'], self.server['port']}")
-        print("---\n")
-
-        await self.manage_conversation()
-        print("CONVERSATION ENDED")
-        print(f"  client address = {self.client['host'], self.client['port']}")
-        print(f"  server address = {self.server['host'], self.server['port']}")
-        print("---\n")
-    
-    async def read_message(self, reader):   
-        header = await reader.read(21)
-        if not header:
+    async def read_message(self, reader):
+        try:
+            header = await reader.read(21)
+            if not header:
+                return None, None
+            length = unpack("<I", header[4:8])[0]
+            payload = await reader.readexactly(length)
+            return header, payload
+        except (ConnectionResetError) as e:
+            print(f"Connection error while reading message: {e}")
             return None, None
-        length = unpack("<I", header[4:8])[0]
-        payload = await reader.readexactly(length)
-        return header, payload
-            
+                
     async def write_message(self, writer, header, payload):
         writer.write(header + payload)
         await writer.drain()
     
-    def intercept(self, header, payload, decrypt=False):
+    async def intercept(self, header, payload, direction=False, decrypt=False):
         if decrypt == True:
             payload = self.decrypt_payload(payload)
         packet = Packet(header, payload)
-        packet.print_to_console()
-        packet.write_to_file()
+        await packet.print_to_console(direction)
+        await packet.write_to_file(direction)
     
     def decrypt_payload(self, payload):
         cipher = Cipher(algorithms.AES(self.proxy["master_key"]), modes.CBC(self.proxy["iv"]), backend=default_backend())
@@ -116,6 +102,8 @@ class Connection:
     async def complete_proxify_handshake(self):
         # client -> proxy
         x = await self.client["reader"].read(3)
+        if x != b'\x05\01\x00':
+            return False
 
         # proxy -> client
         self.client["writer"].write(b'\x05\x00')
@@ -136,13 +124,13 @@ class Connection:
     async def complete_tls_handshake(self):
         # client -> server
         header, payload = await self.read_message(self.client["reader"]) #read
-        self.intercept(header, payload)                                  #intercept
+        await self.intercept(header, payload)                             #intercept
         client_random_bytes = payload[10:]                               
         await self.write_message(self.server["writer"], header, payload) #write
 
         # server -> client
         header, payload = await self.read_message(self.server["reader"])  # read
-        self.intercept(header, payload)                                   # intercept
+        await self.intercept(header, payload)                              # intercept
         # randoms
         server_random_bytes = payload[10:-269]
         # server key
@@ -161,7 +149,7 @@ class Connection:
 
         # client -> server
         header, payload = await self.read_message(self.client["reader"]) #read
-        self.intercept(header, payload)                                  #intercept
+        await self.intercept(header, payload)                            #intercept
         decrypted_secret   = self.rsa_decrypt(                           
                                               payload[10:], 
                                               self.proxy["private_key"]
@@ -180,10 +168,9 @@ class Connection:
 
         # server -> client
         header, payload = await self.read_message(self.server["reader"]) #read 
-        self.intercept(header, payload)                                  #intercept 
+        await self.intercept(header, payload)                            #intercept 
         await self.write_message(self.client["writer"], header, payload) #write
 
-    #HELPERS#
     def rsa_decrypt(self, encrypted, private_key):
         decrypted = private_key.decrypt(
                 encrypted,
@@ -212,22 +199,48 @@ class Connection:
         combined = f1 + f2 + f3
         self.proxy["master_key"] = combined[:32]
         self.proxy["iv"] = combined[32:48]
+        
 
+    """HELPERS"""
+    def import_RSA_key(self, x):
+        if x == "public":
+            full_path = os.path.join(CURRENT_DIR, 'keys/public_key.pem')
+            with open(full_path, "rb") as key_file:
+                public_key = serialization.load_pem_public_key(
+                    key_file.read()
+                )
+            return public_key
+        elif x == "private":
+            full_path = os.path.join(CURRENT_DIR, 'keys/private_key.pem')
+            with open(full_path, "rb") as key_file:
+                private_key = serialization.load_pem_private_key(
+                    key_file.read(),
+                    password=None  
+                )
+            return private_key
+    
+    async def start(self):
+        complete = await self.complete_proxify_handshake()
+        if complete == False:
+            return
+        print("\n---")
+        print("PROXIFY HANDSHAKE COMPLETE")
+        print(f"  client address = {self.client['host'], self.client['port']}")
+        print(f"  server address = {self.server['host'], self.server['port']}")
+        print("---\n")
 
-    """CONVERSATION"""
-    async def manage_conversation(self):     
-        # listeners
-        client_to_server = create_task(self.transfer_message(self.client["reader"], self.server["writer"]))
-        server_to_client = create_task(self.transfer_message(self.server["reader"], self.client["writer"]))
-        await gather(client_to_server, server_to_client) #start 
+        await self.complete_tls_handshake()
+        print("\n---")
+        print("TLS HANDSHAKE COMPLETE")
+        print(f"  client address = {self.client['host'], self.client['port']}")
+        print(f"  server address = {self.server['host'], self.server['port']}")
+        print("---\n")
 
-    async def transfer_message(self, reader, writer):
-        while True:
-            header, payload = await self.read_message(reader)
-            if header is None:
-                break  
-            self.intercept(header, payload, decrypt=True)
-            await self.write_message(writer, header, payload)
+        await self.manage_conversation()
+        print("CONVERSATION ENDED")
+        print(f"  client address = {self.client['host'], self.client['port']}")
+        print(f"  server address = {self.server['host'], self.server['port']}")
+        print("---\n")
 
 
 
