@@ -22,9 +22,10 @@ class Packet:
     """
     extracts, logs, and potentially modifies packet data
     """
-    def __init__(self, header_bytes, payload_bytes, type, port):
+    def __init__(self, header_bytes, payload_bytes, type, port, inject):
         self.type = type
         self.port = port
+        self.inject = inject
         # header data
         self.header_data = self.read_header(header_bytes)
 
@@ -56,7 +57,9 @@ class Packet:
             "type": self.type,
             "length": unpack("<I", header_bytes[4:8])[0],
             "hash": list(unpack("!BBBB", header_bytes[8:12])),
-            "count": unpack("<I", header_bytes[13:17])[0]
+            "count": unpack("<I", header_bytes[13:17])[0],
+            "inject": self.inject,
+            "bytes": list(header_bytes)
         }
         return header_data
     

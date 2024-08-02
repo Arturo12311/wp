@@ -5,20 +5,16 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends   import default_backend
-
-from asyncio import open_connection, create_task, gather, IncompleteReadError
+from asyncio import open_connection, create_task, gather, IncompleteReadError, get_event_loop
 from socket  import inet_ntoa
-from struct  import unpack
+from struct  import unpack, pack
 from packet  import Packet
 import hashlib
 import hmac
-
-import os 
+import os
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-filter_list = [
-    
-]
+filter_list = []
 
 
 """CONNECTION CLASS"""
@@ -47,6 +43,8 @@ class Connection:
                        "host"       : None,
                        "port"       : None,
                        }
+        
+        self.injection_buffer = []
     
     # called by proxy
     async def start(self):
@@ -57,16 +55,83 @@ class Connection:
         except Exception as e:
             print(f"Error occurred: {str(e)}")
             exit(1)
-        
+
+    """INJECTION"""
+    async def listen_for_command(self):
+        while True:
+            # Wait for user input
+            command = await get_event_loop().run_in_executor(None, input)
+            # inject the packet
+            if command.upper() == "INJECT":
+                self.inject_ping()
+
+    def inject_ping(self):     
+        # payload to inject
+        op = bytes([0, 141, 76, 212, 177])
+        encoded_1337 = pack('<Q', 1337)
+        injection_packet = bytes(op) + encoded_1337
+        # encrypt 
+        encrypted_payload = self.encrypt_payload(injection_packet)
+
+        # header
+        header = bytes([84, 79, 90, 32, 16, 0, 0, 0, 255, 255, 255, 255, 0, 13, 0, 0, 0, 141, 76, 212, 177])
+        packet = header + encrypted_payload
+
+        # update buffer
+        self.injection_buffer.append(packet)
+        print("\n---")
+        print("added to injection buffer")
+
 
     """CONVERSATION"""
     async def manage_conversation(self):     
         # listeners
-        client_to_server = create_task(self.communication_stream(self.client["reader"], self.server["writer"], "send"))
-        server_to_client = create_task(self.communication_stream(self.server["reader"], self.client["writer"], "recv"))
-        await gather(client_to_server, server_to_client) #start 
+        client_to_server = create_task(self.server_communication_stream(self.client["reader"], self.server["writer"], "send"))
+        server_to_client = create_task(self.client_communication_stream(self.server["reader"], self.client["writer"], "recv"))
+        command_listener = create_task(self.listen_for_command())
+        await gather(client_to_server, server_to_client, command_listener) #start 
 
-    async def communication_stream(self, reader, writer, type):
+    async def server_communication_stream(self, reader, writer, type):
+        state = 0
+        processed_count = 0
+        try:
+            while True:
+                if self.injection_buffer:  # inject packet if available
+                    inject = True
+                    injection_packet = self.injection_buffer.pop(0)
+                    header = bytearray(injection_packet[:21])
+                    payload = injection_packet[21:]
+                    print("hi")
+
+                    # Increment state for non-ping packets
+                    if header[17:21] != bytes([141, 76, 212, 177]):
+                        state += 1
+                        header[8:12] = pack('<I', state)
+                        print("y")
+
+                    print("i")
+                    processed_count += 1
+                    print(f"Injected packet: {list(header)}. Processed: {processed_count}")
+                else: 
+                    inject = False
+                    try:
+                        header, payload = await self.read_message(reader)
+                        # Update state for all read packets
+                        state += 1
+                        header = bytearray(header)
+                        header[8:12] = pack('<I', state)
+                    except IncompleteReadError:
+                        break  # End loop if socket closes
+
+                # Process and forward the packet
+                await self.intercept(bytes(header), payload, type, inject)
+                await self.write_message(writer, bytes(header), payload)
+        finally:
+            # Cleanup
+            writer.close()
+            await writer.wait_closed()
+
+    async def client_communication_stream(self, reader, writer, type):
         try:
             while True:
                 # read
@@ -75,7 +140,7 @@ class Connection:
                 except IncompleteReadError:
                     break
                 # intercept
-                await self.intercept(header, payload, type)
+                await self.intercept(header, payload, type, False)
                 # write
                 await self.write_message(writer, header, payload)
         finally:
@@ -104,15 +169,15 @@ class Connection:
             print(f"Error writing message: {str(e)}")
             raise
     
-    async def intercept(self, header, payload, type):
+    async def intercept(self, header, payload, type, inject):
         try:
             # get packet info
             payload = self.decrypt_payload(payload)
-            packet = Packet(header, payload, type, self.client["port"])
+            packet = Packet(header, payload, type, self.client["port"], inject)
             # filter
-            if packet.header_data["name"] not in filter_list:
-                await packet.print_to_console()
-                # await packet.write_to_file("log.txt")
+            # if packet.header_data["name"] not in filter_list:
+                # await packet.print_to_console()
+            # await packet.write_to_file("log.txt")
         except Exception as e:
             print(f"Error intercepting packet: {str(e)}")
             raise
@@ -127,6 +192,28 @@ class Connection:
             return plaintext
         except Exception as e:
             print(f"Error decrypting payload: {str(e)}")
+            raise
+    
+    def encrypt_payload(self, plaintext):
+        try:
+            # Create a padder
+            padder = padding.PKCS7(algorithms.AES.block_size).padder()
+            padded_plaintext = padder.update(plaintext) + padder.finalize()
+
+            # Create the cipher
+            cipher = Cipher(algorithms.AES(self.proxy["master_key"]), 
+                            modes.CBC(self.proxy["iv"]), 
+                            backend=default_backend())
+            
+            # Create an encryptor
+            encryptor = cipher.encryptor()
+
+            # Encrypt the padded plaintext
+            ciphertext = encryptor.update(padded_plaintext) + encryptor.finalize()
+
+            return ciphertext
+        except Exception as e:
+            print(f"Error encrypting payload: {str(e)}")
             raise
 
 
