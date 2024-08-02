@@ -101,17 +101,12 @@ class Connection:
                     injection_packet = self.injection_buffer.pop(0)
                     header = bytearray(injection_packet[:21])
                     payload = injection_packet[21:]
-                    print("hi")
 
                     # Increment state for non-ping packets
                     if header[17:21] != bytes([141, 76, 212, 177]):
                         state += 1
                         header[8:12] = pack('<I', state)
-                        print("y")
 
-                    print("i")
-                    processed_count += 1
-                    print(f"Injected packet: {list(header)}. Processed: {processed_count}")
                 else: 
                     inject = False
                     try:
@@ -126,6 +121,7 @@ class Connection:
                 # Process and forward the packet
                 await self.intercept(bytes(header), payload, type, inject)
                 await self.write_message(writer, bytes(header), payload)
+
         finally:
             # Cleanup
             writer.close()
