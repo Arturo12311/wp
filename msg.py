@@ -21,10 +21,10 @@ import os
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Open files using paths relative to the current directory
-with open(os.path.join(current_dir, '_names.json'), 'r') as f:
+with open(os.path.join(current_dir, 'assets/names.json'), 'r') as f:
     names = json.load(f)
 
-with open(os.path.join(current_dir, '_structs.json'), 'r') as f:
+with open(os.path.join(current_dir, 'assets/structs.json'), 'r') as f:
     structs = json.load(f)
 
 # with open(os.path.join(current_dir, '_log.json'), 'r') as f:
@@ -240,6 +240,86 @@ class Msg:
 
     # def log():
     #     pass
+
+"""PACKER"""
+class MsgPacker:
+    def __init__(self):
+        # Load the necessary JSON files
+        with open('assets/names.json', 'r') as f:
+            self.names = json.load(f)
+        with open('assets/structs.json', 'r') as f:
+            self.structs = json.load(f)
+
+    def pack_message(self, name, msg):
+        op = next(key for key, value in self.names.items() if value == name)
+        packed = struct.pack('<?', False)  # Not null
+        packed += struct.pack('<I', int(op))  # Header
+        packed += self.pack_struct(name, msg)
+        return packed
+
+    def pack_struct(self, name, msg):
+        packed = b''
+        struct = self.structs[name]
+        for k, v in struct.items():
+            packed += self.pack(v, msg[k])
+        return packed
+
+    def pack(self, field_type, value):
+        if field_type == "msg":
+            return self.pack_message(value['name'], value['msg'])
+        elif isinstance(field_type, dict):
+            return self.pack_map(field_type, value)
+        elif isinstance(field_type, list):
+            return self.pack_array(field_type[0], value)
+        elif re.match("FTz.*", field_type):
+            return self.pack_struct(field_type[3:], value)
+        else:
+            return self.pack_basic(field_type, value)
+
+    def pack_map(self, field_type, value):
+        if value is None:
+            return struct.pack('<?', True)
+        packed = struct.pack('<?', False)  # Not null
+        packed += struct.pack('<I', len(value))  # Length
+        key_type, val_type = next(iter(field_type.items()))
+        for k, v in value.items():
+            packed += self.pack(key_type, k)
+            packed += self.pack(val_type, v)
+        return packed
+
+    def pack_array(self, item_type, value):
+        if value is None:
+            return struct.pack('<?', True)
+        packed = struct.pack('<?', False)  # Not null
+        packed += struct.pack('<I', len(value))  # Length
+        for item in value:
+            packed += self.pack(item_type, item)
+        return packed
+
+    def pack_basic(self, field_type, value):
+        if field_type[-1] == "0":
+            if value is None:
+                return struct.pack('<?', True)
+            packed = struct.pack('<?', False)  # Not null
+            field_type = field_type[:-1]
+        else:
+            packed = b''
+
+        if field_type == "s":
+            if value is None:
+                return struct.pack('<?', True)
+            encoded = value.encode('utf-8')
+            packed += struct.pack('<?', False)  # Not null
+            packed += struct.pack('<I', len(encoded))  # Length
+            packed += encoded
+        elif re.match(r"ETzBuildingAccessPermissionKindType|ETzAffectSourceSystemCastKindType|ETzResultCodeType|ETzCharacterStateType|ETzConnectionStatusType|ETzMountInteractionStateType|ETzContaminationNaturalDecreaseType|ETzBuildingAccessPermissionKindType", field_type):
+            packed += struct.pack('<I', value)
+        elif re.match("ETz.*", field_type):
+            packed += struct.pack('<B', value)
+        else:
+            packed += struct.pack(f'<{field_type}', value)
+
+        return packed
     
 
 """HELPERS"""

@@ -12,6 +12,8 @@ import os
 import asyncio
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
+from msg import Msg, MsgPacker
+
 with open(os.path.join(CURRENT_DIR, "assets/names.json"), 'r') as f:
     names = load(f)
 with open(os.path.join(CURRENT_DIR, "assets/structs.json"), 'r') as f:
@@ -30,7 +32,7 @@ class Packet:
         self.header_data = self.read_header(header_bytes)
 
         # payload data
-        self.payload_data = self.read_payload(payload_bytes)
+        self.payload_data, self.payload_bytes = self.read_payload(payload_bytes)
 
 
     def read_header(self, header_bytes):
@@ -44,10 +46,11 @@ class Packet:
                 "name": "unknown",
                 "op": op,
                 "type": self.type,
-                "bytes": list(header_bytes),
-                "length": unpack("<I", header_bytes[4:8])[0],
-                "hash": unpack("!BBBB", header_bytes[8:12]),
-                "count": unpack("<I", header_bytes[13:17])[0]
+                "full_length": unpack("<I", header_bytes[4:8])[0],
+                "count": unpack("<I", header_bytes[8:12])[0],
+                "inner_length": unpack("<I", header_bytes[13:17])[0],
+                "inject": self.inject,
+                "bytes": list(header_bytes)
             }
             return header_data
 
@@ -55,9 +58,9 @@ class Packet:
         header_data = {
             "name": names[str(unpack("<I", header_bytes[17:21])[0])],
             "type": self.type,
-            "length": unpack("<I", header_bytes[4:8])[0],
-            "hash": list(unpack("!BBBB", header_bytes[8:12])),
-            "count": unpack("<I", header_bytes[13:17])[0],
+            "full_length": unpack("<I", header_bytes[4:8])[0],
+            "count": unpack("<I", header_bytes[8:12])[0],
+            "inner_length": unpack("<I", header_bytes[13:17])[0],
             "inject": self.inject,
             "bytes": list(header_bytes)
         }
@@ -65,21 +68,33 @@ class Packet:
     
 
     def read_payload(self, payload_bytes):
-        # import structures file
-        full_path = os.path.join(CURRENT_DIR, "assets/structs.json")
-
         # get struct
         name = self.header_data["name"]
         structure = "unknown" if name == "unknown" else structs[name] 
 
-        # payload data
-        payload_data = {
-            "bytes": list(payload_bytes),
-            "struct": structure,
-            # "msg": msg.msg,
-            # "rest": msg.rb 
-        }
-        return payload_data
+        if name == "CharacterMoveRequest":
+            # # modify the packet
+            msg = Msg(payload_bytes)
+            # data = msg.msg
+            # data["CurrentFacingDirectionYaw_rad"] = 0.7
+            # # repack for sending
+            # packer = MsgPacker(data)
+            # packed_msg = packer.pack_message("CharacterMoveRequest", msg)
+            # payload data
+            payload_data = {
+                "bytes": list(payload_bytes),
+                "struct": structure,
+                "msg": msg.msg,
+                "rest": msg.rb 
+            }
+        else:
+            # payload data
+            payload_data = {
+                "bytes": list(payload_bytes),
+                "struct": structure,
+            }
+
+        return payload_data, payload_bytes
 
     """LOGGING"""
     async def print_to_console(self):
