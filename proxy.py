@@ -11,7 +11,6 @@ PROXY_PORT = 8888
 
 
 """MAIN CODE"""
-
 async def handle_client(client_reader, client_writer):
     # handle connection 
     connection = Connection(client_reader, client_writer, PROXY_HOST, PROXY_PORT)
