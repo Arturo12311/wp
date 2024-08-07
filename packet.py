@@ -16,7 +16,7 @@ with open(os.path.join(CURRENT_DIR, "assets/structs.json"), 'r') as f:
 ############################################################################
 
 
-"""PACKET CLASS"""
+"""MAIN CODE"""
 class Packet:
     """
     logs and/or modifies packet data
