@@ -1,6 +1,5 @@
 """IMPORTS"""
 from crypto_handler import Crypto
-from asyncio import get_event_loop
 from struct import pack
 
 
@@ -17,7 +16,7 @@ class Injector():
 
 
     # inject ping packet
-    def ping(self, master_key, iv):  
+    def ping(self):  
 
         # payload to inject
         op = bytes([0, 141, 76, 212, 177])
