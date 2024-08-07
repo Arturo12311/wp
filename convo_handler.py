@@ -121,6 +121,9 @@ class Convo():
     # listen for injection commands
     async def injection_command_listener(self):
 
+        # initiate Injector object
+        injector = Injector(self.master_key, self.iv)
+
         # terminate when sockets close
         while self.server_socket_open and self.client_socket_open:
 
@@ -132,11 +135,11 @@ class Convo():
 
             # inject ping
             if command.upper() == "PING":
-                self.injection_buffer.append(Injector.inject_ping(self.master_key, self.iv))
+                self.injection_buffer.append(injector.ping())
 
             # inject attack
             if command.upper() == "ATTACK":
-                self.injection_buffer.append(Injector.inject_attack())
+                self.injection_buffer.append(injector.attack())
 
     
     # intercept packet
