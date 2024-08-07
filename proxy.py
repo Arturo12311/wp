@@ -1,5 +1,5 @@
 """IMPORTS"""
-from connection import Connection
+from connection_handler import Connection
 import asyncio
 import socket
 
