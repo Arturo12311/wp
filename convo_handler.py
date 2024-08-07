@@ -132,7 +132,7 @@ class Convo():
 
             # inject ping
             if command.upper() == "PING":
-                self.injection_buffer.append(Injector.inject_ping())
+                self.injection_buffer.append(Injector.inject_ping(self.master_key, self.iv))
 
             # inject attack
             if command.upper() == "ATTACK":
