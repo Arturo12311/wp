@@ -15,9 +15,6 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 """MAIN CODE"""
 class Crypto():
-    def __init__(self):
-        pass
-
 
     # rsa keys for mitm
     def import_RSA_key(self, x):
