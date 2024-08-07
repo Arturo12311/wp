@@ -1,7 +1,7 @@
 """IMPORTS"""
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends   import default_backend
-from asyncio import open_connection, create_task, gather, IncompleteReadError
+from asyncio import open_connection, create_task, gather
 from socket  import inet_ntoa
 from struct  import unpack
 
