@@ -1,5 +1,6 @@
 """IMPORTS"""
 from connection_handler import Connection
+
 import asyncio
 import socket
 
@@ -17,7 +18,7 @@ async def handle_client(client_reader, client_writer):
     await connection.start() 
 
     #cleanup
-    client_writer.close() 
+    await client_writer.close()
 
 
 async def start_proxy():

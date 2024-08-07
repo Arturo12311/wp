@@ -12,9 +12,6 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 """MAIN CODE"""
 class Utils():
-    def __init__(self):
-        pass
-
     
     # read from socket
     async def read_message(self, reader):
@@ -106,11 +103,11 @@ class Utils():
                 f.write("-\n")
 
         # noname
-        if self.header_data["name"] == "unknown":
+        if header_data["name"] == "unknown":
             _write("logs/er_nonames.txt")
 
         # remainder
-        # if self.payload_data["rest"] != []:
+        # if payload_data["rest"] != []:
         #     _write("logs/er_remainder.txt")
 
         # regular

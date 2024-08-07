@@ -1,8 +1,8 @@
 """IMPORTS"""
 from msg import Msg
+
 from struct import unpack
 from json import load
-import asyncio
 
 import os
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -68,9 +68,3 @@ class Packet:
 
         # return payload data and payload bytes
         return payload_data, payload_bytes
-
-
-
-    
-
-            
