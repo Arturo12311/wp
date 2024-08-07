@@ -17,7 +17,8 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 class Crypto():
 
     # rsa keys for mitm
-    def import_RSA_key(self, x):
+    @staticmethod
+    def import_RSA_key(x):
 
         # import pub key
         if x == "public":
@@ -48,7 +49,8 @@ class Crypto():
     
 
     # decrypt premaster secret
-    def rsa_decrypt(self, encrypted, private_key):
+    @staticmethod
+    def rsa_decrypt(encrypted, private_key):
 
         # use private key to decrypt
         decrypted = private_key.decrypt(
@@ -61,7 +63,8 @@ class Crypto():
 
 
     # encrypt premaster secret
-    def rsa_encrypt(self, data, public_key):
+    @staticmethod
+    def rsa_encrypt(data, public_key):
 
         # use public key to encrypt
         encrypted = public_key.encrypt(
@@ -74,7 +77,8 @@ class Crypto():
     
 
     # generates master key 
-    def gen_master_key(self, client_random_bytes, server_random_bytes, clientkey):
+    @staticmethod
+    def gen_master_key(client_random_bytes, server_random_bytes, clientkey):
         master_secret = b"master secret"
         master_key = master_secret + client_random_bytes + server_random_bytes
 
@@ -94,7 +98,8 @@ class Crypto():
 
 
     # decrypt payload with cipher 
-    def decrypt_payload(self, payload, master_key, iv):
+    @staticmethod
+    def decrypt_payload(payload, master_key, iv):
         try:
             cipher = Cipher(algorithms.AES(master_key), modes.CBC(iv), backend=default_backend())
             decryptor = cipher.decryptor()
@@ -111,7 +116,8 @@ class Crypto():
     
 
     # encrypt payload with cipher 
-    def encrypt_payload(self, plaintext, master_key, iv):
+    @staticmethod
+    def encrypt_payload(plaintext, master_key, iv):
         try:
             padder = padding.PKCS7(algorithms.AES.block_size).padder()
             padded_plaintext = padder.update(plaintext) + padder.finalize()

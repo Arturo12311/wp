@@ -14,7 +14,8 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 class Utils():
     
     # read from socket
-    async def read_message(self, reader):
+    @staticmethod
+    async def read_message(reader):
         try:
             # read header
             header = await reader.readexactly(21)
@@ -32,7 +33,8 @@ class Utils():
 
 
     # write to socket
-    async def write_message(self, writer, header, payload):
+    @staticmethod
+    async def write_message(writer, header, payload):
         try:
             # write message
             writer.write(header + payload)
@@ -45,12 +47,12 @@ class Utils():
             raise
 
 
-    # print to console async function
-    async def print_to_console(self, metadata, header_data, payload_data):
-        await asyncio.get_event_loop().run_in_executor(None, self._print_to_console, metadata, header_data, payload_data)
+    @staticmethod
+    async def print_to_console(metadata, header_data, payload_data):
+        await asyncio.get_event_loop().run_in_executor(None, Utils._print_to_console, metadata, header_data, payload_data)
 
-    def _print_to_console(self, metadata, header_data, payload_data):
-
+    @staticmethod
+    def _print_to_console(metadata, header_data, payload_data):
         # print metadata
         print("\n--------------")
         for k, v in metadata.items():  
@@ -71,11 +73,12 @@ class Utils():
 
 
     # write to file async function
-    async def write_to_file(self, filename, metadata, header_data, payload_data):
-        await asyncio.get_event_loop().run_in_executor(None, self._write_to_file, filename, metadata, header_data, payload_data)
+    @staticmethod
+    async def write_to_file(filename, metadata, header_data, payload_data):
+        await asyncio.get_event_loop().run_in_executor(None, Utils._write_to_file, filename, metadata, header_data, payload_data)
 
-    def _write_to_file(self, filename, metadata, header_data, payload_data):
-
+    @staticmethod
+    def _write_to_file(filename, metadata, header_data, payload_data):
         # write template
         def _write(path):
 
