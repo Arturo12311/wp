@@ -99,7 +99,7 @@ class Connection:
         # get packet info
         decrypted_payload = decrypt_payload(payload, self.master_key, self.iv)
         if decrypted_payload:
-            packet = Packet(header, payload, stream, True)
+            packet = Packet(header, decrypted_payload, stream, True)
         else:
             packet = Packet(header, payload, stream, False)
 
