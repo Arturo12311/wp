@@ -1,12 +1,17 @@
-import os
+"IMPORTS"
 import re
 import json
 
+import os
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 full_path = os.path.join(CURRENT_DIR, 'log.txt')
 with open(full_path, 'r') as f:
     data = f.read()
+
+
+############################################################################
+
 
 streams = {}
 
