@@ -32,6 +32,7 @@ class Connection:
 
         # tls handshake
         self.master_key, self.iv = await complete_tls_handshake(self.client_reader, self.client_writer, self.server_reader, self.server_writer)
+        print("\nTLS HANDSHAKE COMPLETE", flush=True)
 
         # manage convo
         await self.manage_conversation()
@@ -49,7 +50,7 @@ class Connection:
     async def manage_conversation(self):     
         send_stream = create_task(self.send_stream())
         recv_stream = create_task(self.recv_stream())     
-        inject_listener = create_task(inject_listener())
+        inject_listener = create_task(self.inject_listener())
         await gather(send_stream, recv_stream) 
         inject_listener.cancel()
         await inject_listener
@@ -96,12 +97,17 @@ class Connection:
     """INTERCEPT"""
     async def intercept(self, header, payload, stream):
         # get packet info
-        payload = decrypt_payload(payload)
-        packet = Packet(header, payload, stream)
-        # filter
-        # if packet.header_data["name"] not in filter_list:
-            # await packet.print_to_console()
-        # await packet.write_to_file("log.txt")
+        decrypted_payload = decrypt_payload(payload, self.master_key, self.iv)
+        if decrypted_payload:
+            packet = Packet(header, payload, stream, True)
+        else:
+            packet = Packet(header, payload, stream, False)
+
+        # # filter
+        # # if packet.header_data["name"] not in filter_list:
+        await packet.print_to_console()
+        await packet.write_to_file("log.txt")
+        pass
    
 
     """INJECT"""

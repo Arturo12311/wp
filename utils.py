@@ -3,7 +3,7 @@ from asyncio import IncompleteReadError
 
 async def read_message(reader):
     try:
-        header = await reader.readexactly(21)
+        header = await reader.readexactly(25)
         length = unpack("<I", header[4:8])[0]
         payload = await reader.readexactly(length)
         return header, payload

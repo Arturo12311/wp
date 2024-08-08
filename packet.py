@@ -14,7 +14,8 @@ class Packet:
     """
     intercepted packet object
     """
-    def __init__(self, header_bytes, payload_bytes, stream):
+    def __init__(self, header_bytes, payload_bytes, stream, decrypted):
+        self.decrypted = decrypted
         self.stream = stream
         self.header_data = self.read_header(header_bytes)
         self.payload_data = self.read_payload(payload_bytes)
@@ -38,12 +39,12 @@ class Packet:
     def read_payload(self, payload_bytes):
         name = self.header_data["name"]
         structure = "unknown" if name == "unknown" else structs[name] 
-        msg = Msg(payload_bytes)
+        # msg = Msg(payload_bytes)
         payload_data = {
             "bytes": list(payload_bytes),
             "struct": structure,
-            "parsed": msg.msg,
-            "rest": msg.rb
+            "decrypted": self.decrypted,
+            # "rest": msg.rb
         }
         return payload_data
     

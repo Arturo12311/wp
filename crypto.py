@@ -58,6 +58,8 @@ def gen_master_key(client_random_bytes, server_random_bytes, clientkey):
     return master_key, iv
     
 def decrypt_payload(payload, master_key, iv):
+    if len(payload) % 16 != 0:
+        return False
     cipher = Cipher(algorithms.AES(master_key), modes.CBC(iv), backend=default_backend())
     decryptor = cipher.decryptor()
     padded_plaintext = decryptor.update(payload) + decryptor.finalize()

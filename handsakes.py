@@ -34,15 +34,13 @@ async def complete_tls_handshake(client_reader, client_writer, server_reader, se
     public_key = import_RSA_key("public")
     private_key = import_RSA_key("private")
 
-    print(f"\nServer Reader: {server_reader}\nServer Writer: {server_writer}", flush=True)
-
     # client -> server
     header, payload = await read_message(client_reader) 
     client_random_bytes = payload[10:]                            
     await write_message(server_writer, header, payload) 
 
     # server -> client
-    header, payload = await read_message(server_reader) 
+    header, payload = await read_message(server_reader)
     server_random_bytes = payload[10:-269]
     server_modulus = int.from_bytes(payload[-256:], byteorder='big')
     server_public_numbers = rsa.RSAPublicNumbers(65537, server_modulus)
@@ -62,7 +60,7 @@ async def complete_tls_handshake(client_reader, client_writer, server_reader, se
     await write_message(server_writer, header, adjusted_payload) 
 
     # server -> client
-    header, payload = await read_message(server_reader) 
+    header, payload = await read_message(server_reader)
     await write_message(client_writer, header, payload) 
 
     return master_key, iv
