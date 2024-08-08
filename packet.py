@@ -1,125 +1,70 @@
-
-"""
-todo:
-    implement packet parsing 
-    add start and end points in output
-"""
-
-# from msg import Msg
 from struct import unpack
 from json import load
 import os
 import asyncio
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-
-from msg import Msg, MsgPacker
+from msg import Msg
 
 with open(os.path.join(CURRENT_DIR, "assets/names.json"), 'r') as f:
     names = load(f)
 with open(os.path.join(CURRENT_DIR, "assets/structs.json"), 'r') as f:
     structs = load(f)
 
-"""PACKET CLASS"""
 class Packet:
     """
-    extracts, logs, and potentially modifies packet data
+    intercepted packet object
     """
-    def __init__(self, header_bytes, payload_bytes, type, port, inject):
-        self.type = type
-        self.port = port
-        self.inject = inject
-        # header data
+    def __init__(self, header_bytes, payload_bytes, stream):
+        self.stream = stream
         self.header_data = self.read_header(header_bytes)
-
-        # payload data
-        self.payload_data, self.payload_bytes = self.read_payload(payload_bytes)
+        self.payload_data = self.read_payload(payload_bytes)
 
 
+    """PARSING"""
     def read_header(self, header_bytes):
-        # import names file 
-        full_path = os.path.join(CURRENT_DIR, "assets/names.json")
-
-        # header data if noname
         op = unpack("<I", header_bytes[17:21])[0]
-        if str(op) not in names:
-            header_data = {
-                "name": "unknown",
-                "op": op,
-                "type": self.type,
-                "full_length": unpack("<I", header_bytes[4:8])[0],
-                "count": unpack("<I", header_bytes[8:12])[0],
-                "inner_length": unpack("<I", header_bytes[13:17])[0],
-                "inject": self.inject,
-                "bytes": list(header_bytes)
-            }
-            return header_data
-
-        # regular header data
+        name = names.get(str(op), "unknown")      
         header_data = {
-            "name": names[str(unpack("<I", header_bytes[17:21])[0])],
-            "type": self.type,
-            "full_length": unpack("<I", header_bytes[4:8])[0],
             "count": unpack("<I", header_bytes[8:12])[0],
+            "name": name,
+            "op": op,
+            "full_length": unpack("<I", header_bytes[4:8])[0],
             "inner_length": unpack("<I", header_bytes[13:17])[0],
-            "inject": self.inject,
             "bytes": list(header_bytes)
-        }
+        }   
         return header_data
     
 
     def read_payload(self, payload_bytes):
-        # get struct
         name = self.header_data["name"]
         structure = "unknown" if name == "unknown" else structs[name] 
-
-        if name == "CharacterMoveRequest":
-            # # modify the packet
-            msg = Msg(payload_bytes)
-            # data = msg.msg
-            # data["CurrentFacingDirectionYaw_rad"] = 0.7
-            # # repack for sending
-            # packer = MsgPacker(data)
-            # packed_msg = packer.pack_message("CharacterMoveRequest", msg)
-            # payload data
-            payload_data = {
-                "bytes": list(payload_bytes),
-                "struct": structure,
-                "msg": msg.msg,
-                "rest": msg.rb 
-            }
-        else:
-            # payload data
-            payload_data = {
-                "bytes": list(payload_bytes),
-                "struct": structure,
-            }
-
-        return payload_data, payload_bytes
-
+        msg = Msg(payload_bytes)
+        payload_data = {
+            "bytes": list(payload_bytes),
+            "struct": structure,
+            "parsed": msg.msg,
+            "rest": msg.rb
+        }
+        return payload_data
+    
     """LOGGING"""
     async def print_to_console(self):
-        # Use asyncio.get_event_loop().run_in_executor for potentially blocking operations
         await asyncio.get_event_loop().run_in_executor(None, self._print_to_console)
 
     def _print_to_console(self):
         print("\n--------------")
-        print(self.port)
+        print(self.stream)
         print("-")
-
-        # print header data
         print("HEADER:")
         for k, v in self.header_data.items():  
             print(f"    {k:<8}: {v}")
         print("-")
-
-        # print payload data
         print("PAYLOAD")
         for k, v in self.payload_data.items():  
             print(f"    {k:<8}: {v}")
         print("-")
 
     async def write_to_file(self, filename):
-        # Use asyncio.get_event_loop().run_in_executor for file I/O
         await asyncio.get_event_loop().run_in_executor(None, self._write_to_file, filename)
 
     def _write_to_file(self, filename):
@@ -128,31 +73,27 @@ class Packet:
             full_path = os.path.join(CURRENT_DIR, path)
             os.makedirs(os.path.dirname(full_path), exist_ok=True)
             with open(full_path, 'a') as f:
-                # write header_data
                 f.write("\n-----------------------\n")
-                f.write(f"port: {self.port}\n")
+                f.write(f"{self.stream}\n")
                 f.write("-\n")
                 f.write("HEADER:\n")
                 for k, v in self.header_data.items():  
                     f.write(f"    {k:<8}: {v}\n")
                 f.write("-\n")
-
-                # write payload_data
                 f.write("PAYLOAD\n")
                 for k, v in self.payload_data.items():  
                     f.write(f"    {k:<8}: {v}\n")
                 f.write("-\n")
+        _write(f"logs/{filename}")
 
         # noname
-        if self.header_data["name"] == "unknown":
-            _write("logs/er_nonames.txt")
+        # if self.header_data["name"] == "unknown":
+        #     _write("logs/er_nonames.txt")
 
         # remainder
         # if self.payload_data["rest"] != []:
         #     _write("logs/er_remainder.txt")
 
-        # regular
-        _write(f"logs/{filename}")
 
     
 

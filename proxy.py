@@ -13,9 +13,8 @@ async def start_proxy():
     proxy = await asyncio.start_server(handle_client, PROXY_HOST, PROXY_PORT)
     for sock in proxy.sockets:
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-    async with proxy:
-        print("PROXY INITIATED")
-        await proxy.serve_forever()
+    print("PROXY INITIATED", flush=True)
+    await proxy.serve_forever()
 
 if __name__ == "__main__":
     asyncio.run(start_proxy())

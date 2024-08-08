@@ -1,10 +1,9 @@
-import asyncio
 from socket import inet_ntoa
 from struct import unpack
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend
-from connection_handler import read_message, write_message
 from crypto import rsa_decrypt, rsa_encrypt, import_RSA_key, gen_master_key
+from utils import read_message, write_message
 
 
 """PROXIFY HANDSHAKE"""
@@ -34,6 +33,8 @@ async def complete_proxify_handshake(reader, writer):
 async def complete_tls_handshake(client_reader, client_writer, server_reader, server_writer):
     public_key = import_RSA_key("public")
     private_key = import_RSA_key("private")
+
+    print(f"\nServer Reader: {server_reader}\nServer Writer: {server_writer}", flush=True)
 
     # client -> server
     header, payload = await read_message(client_reader) 

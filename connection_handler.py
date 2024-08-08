@@ -5,24 +5,9 @@ import os
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 from handsakes import complete_proxify_handshake, complete_tls_handshake
 from crypto import encrypt_payload, decrypt_payload
+from utils import read_message, write_message
 
 
-# UTILS
-async def read_message(reader):
-    try:
-        header = await reader.readexactly(21)
-        length = unpack("<I", header[4:8])[0]
-        payload = await reader.readexactly(length)
-        return header, payload
-    except IncompleteReadError:
-        raise #marks end of stream
-            
-async def write_message(writer, header, payload):
-    writer.write(header + payload)
-    await writer.drain()  
-
-
-"""CONNECTION CLASS"""
 class Connection:
     def __init__(self, client_reader, client_writer, proxy_port):
 
@@ -43,6 +28,7 @@ class Connection:
         # proxify handshake
         server_host, server_port = await complete_proxify_handshake(self.client_reader, self.client_writer)
         self.server_reader, self.server_writer = await open_connection(server_host, server_port)
+        print("\nPROXIFY HANDSHAKE COMPLETE", flush=True)
 
         # tls handshake
         self.master_key, self.iv = await complete_tls_handshake(self.client_reader, self.client_writer, self.server_reader, self.server_writer)
@@ -51,10 +37,12 @@ class Connection:
         await self.manage_conversation()
 
         # cleanup
-        self.client_writer.close()
-        self.client_writer.wait_close()
-        self.server_writer.close()
-        self.server_writer.wait_close()
+        if self.client_writer:
+            self.client_writer.close()
+            await self.client_writer.wait_closed()
+        if self.server_writer:
+            self.server_writer.close()
+            await self.server_writer.wait_closed()
 
 
     """CONVO HANDLER"""
@@ -90,7 +78,7 @@ class Connection:
                     break  
 
             # Intercept and forward the packet
-            await intercept(header, payload, "send")
+            await self.intercept(header, payload, "send")
             await write_message(self.server_writer, header, payload)
 
     async def recv_stream(self):
@@ -116,7 +104,7 @@ class Connection:
         # await packet.write_to_file("log.txt")
    
 
-   """INJECT"""
+    """INJECT"""
     async def inject_listener(self):
         while True:
             command = await get_event_loop().run_in_executor(None, input)
