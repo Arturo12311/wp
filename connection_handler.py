@@ -9,9 +9,9 @@ from utils import read_message, write_message
 
 
 class Connection:
-    def __init__(self, client_reader, client_writer, proxy_port):
+    def __init__(self, client_reader, client_writer):
 
-        self.port = proxy_port
+        self.port = client_writer.get_extra_info("peername")[1]
 
         self.client_reader = client_reader
         self.client_writer = client_writer
@@ -61,7 +61,6 @@ class Connection:
 
             # Inject packet if available
             if self.injection_buffer:  
-                is_injected = True
                 injection_packet = self.injection_buffer.pop(0)
                 header = bytearray(injection_packet[:21])
                 payload = injection_packet[21:]
@@ -70,8 +69,7 @@ class Connection:
                     count += 1
                     header[8:12] = pack('<I', count)
 
-            else: 
-                is_injected = False
+            else:
                 try:
                     header, payload = await read_message(self.client_reader)
                     count += 1
@@ -81,7 +79,7 @@ class Connection:
                     break  
 
             # Intercept and forward the packet
-            await self.intercept(header, payload, "send", is_injected)
+            await self.intercept(header, payload, "send")
             await write_message(self.server_writer, header, payload)
 
     async def recv_stream(self):
@@ -97,23 +95,23 @@ class Connection:
 
 
     """INTERCEPT"""
-    async def intercept(self, header, payload, stream, is_injected=False):
+    async def intercept(self, header, payload, stream):
         meta = {
             "port": self.port,
             "stream": stream,
-            "injected": is_injected
         }
         decrypted_payload = decrypt_payload(payload, self.master_key, self.iv)
-        print(f"\n{list(decrypted_payload)}")
-        # if decrypted_payload:
-        #     packet = Packet(header, decrypted_payload, stream, True)
-        # else:
-        #     packet = Packet(header, payload, stream, False)
+        # print(f"\n{list(decrypted_payload)}")
+
+        packet = Packet(header, decrypted_payload, meta)
 
         # # filter
         # # if packet.header_data["name"] not in filter_list:
         # await packet.print_to_console()
-        # await packet.write_to_file("log.txt")
+        try:
+            await packet.write_to_file("log.txt")
+        except UnicodeEncodeError:
+            pass 
         pass
    
 
