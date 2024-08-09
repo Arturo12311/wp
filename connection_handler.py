@@ -109,7 +109,7 @@ class Connection:
         # # if packet.header_data["name"] not in filter_list:
         # await packet.print_to_console()
         try:
-            await packet.write_to_file("log.txt")
+            await packet.write_to_files()
         except UnicodeEncodeError:
             pass 
         pass
