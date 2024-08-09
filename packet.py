@@ -2,6 +2,7 @@ from struct import unpack
 from json import load
 import os
 import asyncio
+import datetime
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 from msg import Msg
 
@@ -37,7 +38,7 @@ class Packet:
 
     def read_payload(self, payload_bytes):
         name = self.header_data["name"]
-        if name == "unknown":
+        if self.header_data["name"] not in structs:
             structure = None
             msg = None
             # remainder = None
@@ -74,10 +75,10 @@ class Packet:
             print(f"    {k:<8}: {v}")
         print("-")
 
-    async def write_to_file(self, filename):
-        await asyncio.get_event_loop().run_in_executor(None, self._write_to_file, filename)
+    async def write_to_files(self):
+        await asyncio.get_event_loop().run_in_executor(None, self._write_to_files)
 
-    def _write_to_file(self, filename):
+    def _write_to_files(self):
         def _write(path):
             # open file
             full_path = os.path.join(CURRENT_DIR, path)
@@ -96,11 +97,13 @@ class Packet:
                 for k, v in self.payload_data.items():  
                     f.write(f"    {k:<8}: {v}\n")
                 f.write("-\n")
-        _write(f"logs/{filename}")
+
+        # timestamped write
+        _write(f"C:/al/logs/log_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
 
         # noname
-        # if self.header_data["name"] == "unknown":
-        #     _write("logs/er_nonames.txt")
+        if self.header_data["name"] == "unknown":
+            _write(f"C:/al/logs/unknown-name-packets.txt")
 
         # remainder
         # if self.payload_data["rest"] != []:
