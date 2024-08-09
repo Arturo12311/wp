@@ -58,14 +58,16 @@ def gen_master_key(client_random_bytes, server_random_bytes, clientkey):
     return master_key, iv
     
 def decrypt_payload(payload, master_key, iv):
-    if len(payload) % 16 != 0:
-        return False
+    padding_length = 16 - (len(payload) % 16)
+    if padding_length == 16:
+        padding_length = 0
+    padded_payload = payload + b'\x00' * padding_length
     cipher = Cipher(algorithms.AES(master_key), modes.CBC(iv), backend=default_backend())
     decryptor = cipher.decryptor()
-    padded_plaintext = decryptor.update(payload) + decryptor.finalize()
-    unpadder = padding.PKCS7(algorithms.AES.block_size).unpadder()
-    plaintext = unpadder.update(padded_plaintext) + unpadder.finalize()
-    return plaintext
+    decrypted_data = decryptor.update(padded_payload) + decryptor.finalize()
+    if padding_length > 0:
+        decrypted_data = decrypted_data[:-padding_length]
+    return decrypted_data
 
 def encrypt_payload(plaintext, master_key, iv):
     padder = padding.PKCS7(algorithms.AES.block_size).padder()

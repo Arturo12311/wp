@@ -103,8 +103,8 @@ class Connection:
             "stream": stream,
             "injected": is_injected
         }
-        # get packet info
-        # decrypted_payload = decrypt_payload(payload, self.master_key, self.iv)
+        decrypted_payload = decrypt_payload(payload, self.master_key, self.iv)
+        print(f"\n{list(decrypted_payload)}")
         # if decrypted_payload:
         #     packet = Packet(header, decrypted_payload, stream, True)
         # else:
