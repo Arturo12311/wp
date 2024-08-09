@@ -1,4 +1,4 @@
-from asyncio import open_connection, create_task, gather, IncompleteReadError, get_event_loop, Queue
+from asyncio import open_connection, create_task, gather, IncompleteReadError, get_event_loop, Queue, sleep
 from struct  import unpack, pack
 from packet  import Packet
 import os
@@ -58,7 +58,7 @@ class Connection:
     async def send_stream(self):
         count = 0
         while True:
-
+            await sleep(0)
             # Inject packet if available
             if not self.injection_buffer.empty():
                 packet = await self.injection_buffer.get()
@@ -66,6 +66,7 @@ class Connection:
                 print(f"\nINJECTED ~ {list(header)} \n{list(payload)}\n---\n", flush=True)
 
             else:
+                print(f"Buffer size now: {self.injection_buffer.qsize()}")
                 try:
                     header, payload = await read_message(self.client_reader)
                 except IncompleteReadError:
@@ -74,9 +75,8 @@ class Connection:
             if header[17:21] != bytes([141, 76, 212, 177]):
                 count += 1
                 packed_count = pack('<I', count)
-
-            header = bytearray(header)
-            header[8:12] = packed_count
+                header = bytearray(header)
+                header[8:12] = packed_count
 
             # Intercept and forward the packet
             await self.intercept(header, payload, "send")
@@ -133,6 +133,6 @@ class Connection:
 
         # update buffer
         await self.injection_buffer.put(packet)
-        print("added")
+        print(f"Drink command added. Buffer size now: {self.injection_buffer.qsize()}")
 
     
