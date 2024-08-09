@@ -1,9 +1,12 @@
 from connection_handler import Connection
 import asyncio
 import socket
+import datetime
+from config import initialize_timestamp
 
 PROXY_HOST = '192.168.2.145'
 PROXY_PORT = 8888
+TIMESTAMP = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
 
 async def handle_client(reader, writer):
     connection = Connection(reader, writer)
@@ -15,6 +18,7 @@ async def handle_client(reader, writer):
         await connection.close()
 
 async def start_proxy():
+    initialize_timestamp()
     proxy = await asyncio.start_server(handle_client, PROXY_HOST, PROXY_PORT)
     for sock in proxy.sockets:
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)

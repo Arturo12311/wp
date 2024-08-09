@@ -2,9 +2,9 @@ from struct import unpack
 from json import load
 import os
 import asyncio
-import datetime
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 from msg import Msg
+from config import get_timestamp
 
 with open(os.path.join(CURRENT_DIR, "assets/names.json"), 'r') as f:
     names = load(f)
@@ -99,7 +99,8 @@ class Packet:
                 f.write("-\n")
 
         # timestamped write
-        _write(f"C:/al/logs/log_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+        timestamp = get_timestamp()
+        _write(f"C:/al/logs/log_{timestamp}.log")
 
         # noname
         if self.header_data["name"] == "unknown":
