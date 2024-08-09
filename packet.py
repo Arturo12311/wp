@@ -43,9 +43,12 @@ class Packet:
             msg = None
             # remainder = None
         else:
-            msg = Msg(payload_bytes)
-            structure = msg.struct
-            msg = msg.msg
+            try:
+                msg = Msg(payload_bytes)
+                structure = msg.struct
+                msg = msg.msg
+            except KeyError:
+                pass
             # remainder = msg.rb
 
         payload_data = {
