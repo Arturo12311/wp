@@ -6,7 +6,7 @@ PROXY_HOST = '192.168.2.145'
 PROXY_PORT = 8888
 
 async def handle_client(reader, writer):
-    connection = Connection(reader, writer, PROXY_PORT)
+    connection = Connection(reader, writer)
     try:
         await connection.start()
     except (ConnectionResetError, OSError):
