@@ -1,4 +1,4 @@
-from asyncio import open_connection, create_task, gather, IncompleteReadError, get_event_loop
+from asyncio import open_connection, create_task, gather, IncompleteReadError, get_event_loop, Queue
 from struct  import unpack, pack
 from packet  import Packet
 import os
@@ -21,7 +21,7 @@ class Connection:
         self.master_key = None
         self.iv = None
         
-        self.injection_buffer = []
+        self.injection_buffer = Queue()
 
     
     async def start(self):
@@ -60,23 +60,23 @@ class Connection:
         while True:
 
             # Inject packet if available
-            if self.injection_buffer:  
-                injection_packet = self.injection_buffer.pop(0)
-                header = bytearray(injection_packet[:21])
-                payload = injection_packet[21:]
-                # Increment state for non-ping packets
-                if header[17:21] != bytes([141, 76, 212, 177]):
-                    count += 1
-                    header[8:12] = pack('<I', count)
+            if not self.injection_buffer.empty():
+                packet = await self.injection_buffer.get()
+                header, payload = packet[:25], packet[25:]
+                print(f"\nINJECTED ~ {list(header)} \n{list(payload)}\n---\n", flush=True)
 
             else:
                 try:
                     header, payload = await read_message(self.client_reader)
-                    count += 1
-                    header = bytearray(header)
-                    header[8:12] = pack('<I', count)
                 except IncompleteReadError:
                     break  
+            
+            if header[17:21] != bytes([141, 76, 212, 177]):
+                count += 1
+                packed_count = pack('<I', count)
+
+            header = bytearray(header)
+            header[8:12] = packed_count
 
             # Intercept and forward the packet
             await self.intercept(header, payload, "send")
@@ -119,21 +119,20 @@ class Connection:
     async def inject_listener(self):
         while True:
             command = await get_event_loop().run_in_executor(None, input)
-            if command.upper() == "INJECT":
-                self.inject_ping()
+            if command.upper() == "DRINK":
+                await self.inject_drink()
 
-    def inject_ping(self):     
+    async def inject_drink(self):     
         # header
-        header = bytes([84, 79, 90, 32, 16, 0, 0, 0, 255, 255, 255, 255, 0, 13, 0, 0, 0, 141, 76, 212, 177])
-        packet = header + encrypted_payload
+        header = bytes([84, 79, 90, 32, 32, 0, 0, 0, 229, 23, 0, 0, 0, 18, 0, 0, 0, 65, 54, 184, 121, 255, 255, 255, 255])
+
         # payload to inject
-        op = bytes([0, 141, 76, 212, 177])
-        encoded_1337 = pack('<Q', 1337)
-        injection_packet = bytes(op) + encoded_1337
-        encrypted_payload = encrypt_payload(injection_packet, self.master_key, self.iv)
+        payload = bytes([0, 65, 54, 184, 121, 0, 0, 0, 0, 0, 0, 0, 0, 166, 7, 19, 81, 1, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14])
+        encrypted_payload = encrypt_payload(payload, self.master_key, self.iv)
+        packet = header + encrypted_payload
+
         # update buffer
-        self.injection_buffer.append(packet)
-        print("\n---")
-        print("added to injection buffer")
+        await self.injection_buffer.put(packet)
+        print("added")
 
     
