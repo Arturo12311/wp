@@ -14,9 +14,8 @@ class Packet:
     """
     intercepted packet object
     """
-    def __init__(self, header_bytes, payload_bytes, stream, decrypted):
-        self.decrypted = decrypted
-        self.stream = stream
+    def __init__(self, header_bytes, payload_bytes, meta):
+        self.meta = meta
         self.header_data = self.read_header(header_bytes)
         self.payload_data = self.read_payload(payload_bytes)
 
@@ -29,8 +28,8 @@ class Packet:
             "count": unpack("<I", header_bytes[8:12])[0],
             "name": name,
             "op": op,
-            "full_length": unpack("<I", header_bytes[4:8])[0],
-            "inner_length": unpack("<I", header_bytes[13:17])[0],
+            "full": unpack("<I", header_bytes[4:8])[0],
+            "inner": unpack("<I", header_bytes[13:17])[0],
             "bytes": list(header_bytes)
         }   
         return header_data
@@ -38,13 +37,21 @@ class Packet:
 
     def read_payload(self, payload_bytes):
         name = self.header_data["name"]
-        structure = "unknown" if name == "unknown" else structs[name] 
-        # msg = Msg(payload_bytes)
+        if name == "unknown":
+            structure = None
+            msg = None
+            # remainder = None
+        else:
+            msg = Msg(payload_bytes)
+            structure = msg.struct
+            msg = msg.msg
+            # remainder = msg.rb
+
         payload_data = {
             "bytes": list(payload_bytes),
             "struct": structure,
-            "decrypted": self.decrypted,
-            # "rest": msg.rb
+            "msg": msg,
+            # "rest": remainder
         }
         return payload_data
     
@@ -54,7 +61,9 @@ class Packet:
 
     def _print_to_console(self):
         print("\n--------------")
-        print(self.stream)
+        print("META:")
+        for k, v in self.meta.items():  
+            print(f"    {k:<8}: {v}")
         print("-")
         print("HEADER:")
         for k, v in self.header_data.items():  
@@ -75,7 +84,9 @@ class Packet:
             os.makedirs(os.path.dirname(full_path), exist_ok=True)
             with open(full_path, 'a') as f:
                 f.write("\n-----------------------\n")
-                f.write(f"{self.stream}\n")
+                f.write("META:\n")
+                for k, v in self.meta.items():  
+                    f.write(f"    {k:<8}: {v}\n")
                 f.write("-\n")
                 f.write("HEADER:\n")
                 for k, v in self.header_data.items():  
