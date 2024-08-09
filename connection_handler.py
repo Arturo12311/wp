@@ -37,7 +37,7 @@ class Connection:
         # manage convo
         await self.manage_conversation()
 
-        # cleanup
+    async def close(self):
         if self.client_writer:
             self.client_writer.close()
             await self.client_writer.wait_closed()
@@ -61,6 +61,7 @@ class Connection:
 
             # Inject packet if available
             if self.injection_buffer:  
+                is_injected = True
                 injection_packet = self.injection_buffer.pop(0)
                 header = bytearray(injection_packet[:21])
                 payload = injection_packet[21:]
@@ -70,6 +71,7 @@ class Connection:
                     header[8:12] = pack('<I', count)
 
             else: 
+                is_injected = False
                 try:
                     header, payload = await read_message(self.client_reader)
                     count += 1
@@ -79,7 +81,7 @@ class Connection:
                     break  
 
             # Intercept and forward the packet
-            await self.intercept(header, payload, "send")
+            await self.intercept(header, payload, "send", is_injected)
             await write_message(self.server_writer, header, payload)
 
     async def recv_stream(self):
@@ -95,18 +97,23 @@ class Connection:
 
 
     """INTERCEPT"""
-    async def intercept(self, header, payload, stream):
+    async def intercept(self, header, payload, stream, is_injected=False):
+        meta = {
+            "port": self.port,
+            "stream": stream,
+            "injected": is_injected
+        }
         # get packet info
-        decrypted_payload = decrypt_payload(payload, self.master_key, self.iv)
-        if decrypted_payload:
-            packet = Packet(header, decrypted_payload, stream, True)
-        else:
-            packet = Packet(header, payload, stream, False)
+        # decrypted_payload = decrypt_payload(payload, self.master_key, self.iv)
+        # if decrypted_payload:
+        #     packet = Packet(header, decrypted_payload, stream, True)
+        # else:
+        #     packet = Packet(header, payload, stream, False)
 
         # # filter
         # # if packet.header_data["name"] not in filter_list:
-        await packet.print_to_console()
-        await packet.write_to_file("log.txt")
+        # await packet.print_to_console()
+        # await packet.write_to_file("log.txt")
         pass
    
 
