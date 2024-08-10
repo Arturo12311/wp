@@ -19,9 +19,8 @@ class Connection:
         self.master_key = None
         self.iv = None
         
+        self.inject_listener_task = None
         self.injection_buffer = Queue()
-
-        self.connection_active = True
 
     
     async def start(self):
@@ -31,56 +30,63 @@ class Connection:
         print("\nPROXIFY HANDSHAKE COMPLETE", flush=True)
 
         # tls handshake
-        self.master_key, self.iv = await complete_tls_handshake(self.client_reader, self.client_writer, self.server_reader, self.server_writer)
+        try:
+            self.master_key, self.iv = await complete_tls_handshake(self.client_reader, self.client_writer, self.server_reader, self.server_writer)
+        except IncompleteReadError:
+            return
         print("\nTLS HANDSHAKE COMPLETE\n", flush=True)
 
         # manage convo
         await self.manage_conversation()
 
     async def close(self):
-        try: 
-            if self.client_writer:
-                self.client_writer.close()
-                await self.client_writer.wait_closed()
-            if self.server_writer:
-                self.server_writer.close()
-                await self.server_writer.wait_closed()
-        except ConnectionAbortedError:
-            pass
+        if self.client_writer:
+            self.client_writer.close()
+            await self.client_writer.wait_closed()
+        if self.server_writer:
+            self.server_writer.close()
+            await self.server_writer.wait_closed()
 
 
     """CONVO HANDLER"""
     async def manage_conversation(self):     
         send_stream = create_task(self.send_stream())
         recv_stream = create_task(self.recv_stream())     
-        inject_listener = create_task(self.inject_listener())
         await gather(send_stream, recv_stream) 
-        inject_listener.cancel()
-        await inject_listener
+        if self.inject_listener_task:
+            self.inject_listener_task.cancel()
+            await self.inject_listener_task
 
     async def send_stream(self):
         count = 0
         while True:
-            await sleep(0)
-            # Inject packet if available
+
+            # read injection packet
             if not self.injection_buffer.empty():
                 is_inject = True
                 packet = await self.injection_buffer.get()
                 header, payload = packet[:25], packet[25:]
                 print(f"INJECTED \n---\n\n", flush=True)
 
+            # read regular packet
             else:
+                is_inject = False
                 try:
-                    is_inject = False
                     header, payload = await read_message(self.client_reader)
                 except IncompleteReadError:
                     break
             
+            # callibrate count
             if header[17:21] != bytes([141, 76, 212, 177]):
                 count += 1
                 packed_count = pack('<I', count)
                 header = bytearray(header)
                 header[8:12] = packed_count
+
+            # checks if is game connection where injections should happen 
+            if not self.inject_listener_task and header[17:21]==bytes([80, 143, 20, 123]):
+                self.inject_listener_task = create_task(self.run_inject_listener())
+                print("INJECT LISTENER ACTIVATED", flush=True)
 
             # Intercept and forward the packet
             await self.intercept(header, payload, "send", is_inject)
@@ -123,7 +129,7 @@ class Connection:
    
 
     """INJECT"""
-    async def inject_listener(self):
+    async def run_inject_listener(self):
         while True:
             command = await get_event_loop().run_in_executor(None, input)
             if command.upper() == "DRINK":
