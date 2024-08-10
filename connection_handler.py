@@ -1,8 +1,6 @@
 from asyncio import open_connection, create_task, gather, IncompleteReadError, get_event_loop, Queue, sleep
 from struct  import unpack, pack
 from packet  import Packet
-import os
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 from handsakes import complete_proxify_handshake, complete_tls_handshake
 from crypto import encrypt_payload, decrypt_payload
 from utils import read_message, write_message
@@ -23,6 +21,8 @@ class Connection:
         
         self.injection_buffer = Queue()
 
+        self.connection_active = True
+
     
     async def start(self):
         # proxify handshake
@@ -38,12 +38,15 @@ class Connection:
         await self.manage_conversation()
 
     async def close(self):
-        if self.client_writer:
-            self.client_writer.close()
-            await self.client_writer.wait_closed()
-        if self.server_writer:
-            self.server_writer.close()
-            await self.server_writer.wait_closed()
+        try: 
+            if self.client_writer:
+                self.client_writer.close()
+                await self.client_writer.wait_closed()
+            if self.server_writer:
+                self.server_writer.close()
+                await self.server_writer.wait_closed()
+        except ConnectionAbortedError:
+            pass
 
 
     """CONVO HANDLER"""
@@ -71,7 +74,7 @@ class Connection:
                     is_inject = False
                     header, payload = await read_message(self.client_reader)
                 except IncompleteReadError:
-                    break  
+                    break
             
             if header[17:21] != bytes([141, 76, 212, 177]):
                 count += 1
@@ -125,6 +128,8 @@ class Connection:
             command = await get_event_loop().run_in_executor(None, input)
             if command.upper() == "DRINK":
                 await self.inject_drink()
+            # elif command.upper() == "ATTACK":
+            #     await self.inject_attack()
 
     async def inject_drink(self):     
         # header
@@ -138,5 +143,18 @@ class Connection:
         # update buffer
         await self.injection_buffer.put(packet)
         print(f"added to injection buffer {self.port}")
+
+    # async def inject_attack(self):     
+    #     # header
+    #     header = bytes([84, 79, 90, 32, 32, 0, 0, 0, 255, 255, 255, 255, 0, 27, 0, 0, 0, 9, 206, 49, 105, 255, 255, 255, 255])
+
+    #     # payload to inject
+    #     payload = bytes([0, 9, 206, 49, 105, 130, 132, 172, 17, 1, 1, 0, 0, 0, 160, 95, 203, 57, 78, 185, 220, 8, 0, 0, 0, 0, 0])
+    #     encrypted_payload = encrypt_payload(payload, self.master_key, self.iv)
+    #     packet = header + encrypted_payload
+
+    #     # update buffer
+    #     await self.injection_buffer.put(packet)
+    #     print(f"added to injection buffer {self.port}")
 
     
