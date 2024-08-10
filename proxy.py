@@ -10,12 +10,12 @@ TIMESTAMP = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
 
 async def handle_client(reader, writer):
     connection = Connection(reader, writer)
-    try:
-        await connection.start()
-    except (ConnectionResetError, OSError):
-        pass
+    try: await connection.start()
+    except (ConnectionResetError, OSError): pass
     finally:
-        await connection.close()
+        try: await connection.close()
+        except ConnectionResetError: pass
+        print(f"CONNECTION CLOSED", flush=True)
 
 async def start_proxy():
     initialize_timestamp()
