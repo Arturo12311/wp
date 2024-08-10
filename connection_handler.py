@@ -61,6 +61,7 @@ class Connection:
             await sleep(0)
             # Inject packet if available
             if not self.injection_buffer.empty():
+                is_inject = True
                 packet = await self.injection_buffer.get()
                 header, payload = packet[:25], packet[25:]
                 print(f"\nINJECTED ~ {list(header)} \n{list(payload)}\n---\n", flush=True)
@@ -68,6 +69,7 @@ class Connection:
             else:
                 print(f"Buffer size now: {self.injection_buffer.qsize()}")
                 try:
+                    is_inject = False
                     header, payload = await read_message(self.client_reader)
                 except IncompleteReadError:
                     break  
@@ -79,7 +81,7 @@ class Connection:
                 header[8:12] = packed_count
 
             # Intercept and forward the packet
-            await self.intercept(header, payload, "send")
+            await self.intercept(header, payload, "send", is_inject)
             await write_message(self.server_writer, header, payload)
 
     async def recv_stream(self):
@@ -95,11 +97,14 @@ class Connection:
 
 
     """INTERCEPT"""
-    async def intercept(self, header, payload, stream):
+    async def intercept(self, header, payload, stream, is_inject=False):
         meta = {
             "port": self.port,
             "stream": stream,
         }
+        if is_inject:
+            meta["injected"] = True
+
         decrypted_payload = decrypt_payload(payload, self.master_key, self.iv)
         # print(f"\n{list(decrypted_payload)}")
 
@@ -127,7 +132,7 @@ class Connection:
         header = bytes([84, 79, 90, 32, 32, 0, 0, 0, 229, 23, 0, 0, 0, 18, 0, 0, 0, 65, 54, 184, 121, 255, 255, 255, 255])
 
         # payload to inject
-        payload = bytes([0, 65, 54, 184, 121, 0, 0, 0, 0, 0, 0, 0, 0, 166, 7, 19, 81, 1, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14])
+        payload = bytes([0, 65, 54, 184, 121, 0, 0, 0, 0, 0, 0, 0, 0, 166, 7, 19, 81, 1])
         encrypted_payload = encrypt_payload(payload, self.master_key, self.iv)
         packet = header + encrypted_payload
 
