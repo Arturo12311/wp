@@ -1,14 +1,12 @@
 from struct import unpack
 from json import load
-import os
 import asyncio
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 from msg import Msg
 from config import get_timestamp
 
-with open(os.path.join(CURRENT_DIR, "assets/names.json"), 'r') as f:
+with open("C:/al/assets/names.json", 'r') as f:
     names = load(f)
-with open(os.path.join(CURRENT_DIR, "assets/structs.json"), 'r') as f:
+with open("C:/al/assets/structs.json", 'r') as f:
     structs = load(f)
 
 class Packet:
@@ -84,10 +82,7 @@ class Packet:
 
     def _write_to_files(self):
         def _write(path):
-            # open file
-            full_path = os.path.join(CURRENT_DIR, path)
-            os.makedirs(os.path.dirname(full_path), exist_ok=True)
-            with open(full_path, 'a') as f:
+            with open(path, 'a') as f:
                 f.write("\n-----------------------\n")
                 f.write("META:\n")
                 for k, v in self.meta.items():  

@@ -4,13 +4,10 @@ import re
 import sys
 import io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-import os
-current_dir = os.path.dirname(os.path.abspath(__file__))
 
-with open(os.path.join(current_dir, 'assets/names.json'), 'r') as f:
+with open("C:/al/assets/names.json", 'r') as f:
     names = json.load(f)
-
-with open(os.path.join(current_dir, 'assets/structs.json'), 'r') as f:
+with open("C:/al/assets/structs.json", 'r') as f:
     structs = json.load(f)
 
 
