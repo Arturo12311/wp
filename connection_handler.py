@@ -32,7 +32,7 @@ class Connection:
 
         # tls handshake
         self.master_key, self.iv = await complete_tls_handshake(self.client_reader, self.client_writer, self.server_reader, self.server_writer)
-        print("\nTLS HANDSHAKE COMPLETE", flush=True)
+        print("\nTLS HANDSHAKE COMPLETE\n", flush=True)
 
         # manage convo
         await self.manage_conversation()
@@ -64,10 +64,9 @@ class Connection:
                 is_inject = True
                 packet = await self.injection_buffer.get()
                 header, payload = packet[:25], packet[25:]
-                print(f"\nINJECTED ~ {list(header)} \n{list(payload)}\n---\n", flush=True)
+                print(f"INJECTED \n---\n\n", flush=True)
 
             else:
-                print(f"Buffer size now: {self.injection_buffer.qsize()}")
                 try:
                     is_inject = False
                     header, payload = await read_message(self.client_reader)
@@ -129,7 +128,7 @@ class Connection:
 
     async def inject_drink(self):     
         # header
-        header = bytes([84, 79, 90, 32, 32, 0, 0, 0, 229, 23, 0, 0, 0, 18, 0, 0, 0, 65, 54, 184, 121, 255, 255, 255, 255])
+        header = bytes([84, 79, 90, 32, 32, 0, 0, 0, 255, 255, 255, 255, 0, 18, 0, 0, 0, 65, 54, 184, 121, 255, 255, 255, 255])
 
         # payload to inject
         payload = bytes([0, 65, 54, 184, 121, 0, 0, 0, 0, 0, 0, 0, 0, 166, 7, 19, 81, 1])
@@ -138,6 +137,6 @@ class Connection:
 
         # update buffer
         await self.injection_buffer.put(packet)
-        print(f"Drink command added. Buffer size now: {self.injection_buffer.qsize()}")
+        print(f"added to injection buffer {self.port}")
 
     
