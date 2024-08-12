@@ -4,6 +4,7 @@ from packet  import Packet
 from handsakes import complete_proxify_handshake, complete_tls_handshake
 from crypto import encrypt_payload, decrypt_payload
 from utils import read_message, write_message
+import re
 
 
 class Connection:
@@ -66,7 +67,7 @@ class Connection:
                 is_inject = True
                 packet = await self.injection_buffer.get()
                 header, payload = packet[:25], packet[25:]
-                print(f"INJECTED \n---\n\n", flush=True)
+                # print(f"INJECTED \n---\n\n", flush=True)
 
             # read regular packet
             else:
@@ -132,35 +133,38 @@ class Connection:
     async def run_inject_listener(self):
         while True:
             command = await get_event_loop().run_in_executor(None, input)
-            if command.upper() == "DRINK":
-                await self.inject_drink()
-            # elif command.upper() == "ATTACK":
-            #     await self.inject_attack()
+            drink_match = re.match(r'^drink\s+(\w+)(?:\s+(\d+))?$', command)
 
-    async def inject_drink(self):     
-        # header
-        header = bytes([84, 79, 90, 32, 32, 0, 0, 0, 255, 255, 255, 255, 0, 18, 0, 0, 0, 65, 54, 184, 121, 255, 255, 255, 255])
+            if drink_match:
+                type = drink_match.group(1)
+                amount = drink_match.group(2)
+                amount = int(amount) if amount else 1
+                create_task(self.inject_drink(type, amount))
+                print(f"Started drink injection: type={type}, amount={amount}", flush=True)
+            else:
+                print("Unknown command. Please try again.", flush=True)
+        
 
-        # payload to inject
-        payload = bytes([0, 65, 54, 184, 121, 0, 0, 0, 0, 0, 0, 0, 0, 166, 7, 19, 81, 1])
+    async def inject_drink(self, type, amount=1):   
+        if type == "red": 
+            header = bytes([84, 79, 90, 32, 32, 0, 0, 0, 255, 255, 255, 255, 0, 18, 0, 0, 0, 65, 54, 184, 121, 255, 255, 255, 255])
+            payload = bytes([0, 65, 54, 184, 121, 0, 0, 0, 0, 0, 0, 0, 0, 166, 7, 19, 81, 1])
+            sleep_len = 1
+        elif type == "blue":
+            header = bytes([84, 79, 90, 32, 32, 0, 0, 0, 122, 4, 0, 0, 0, 18, 0, 0, 0, 65, 54, 184, 121, 255, 255, 255, 255])
+            payload = bytes([0, 65, 54, 184, 121, 0, 0, 0, 0, 0, 0, 0, 0, 27, 157, 88, 106, 1])
+            sleep_len = 32
+        else:
+            return
+
         encrypted_payload = encrypt_payload(payload, self.master_key, self.iv)
         packet = header + encrypted_payload
 
-        # update buffer
-        await self.injection_buffer.put(packet)
-        print(f"added to injection buffer {self.port}")
+        for _ in range(amount):
+            await self.injection_buffer.put(packet)
+            await sleep(sleep_len)
+        
+        print(f"Finished injecting {amount} {type} drinks", flush=True)
 
-    # async def inject_attack(self):     
-    #     # header
-    #     header = bytes([84, 79, 90, 32, 16, 0, 0, 0, 255, 255, 255, 255, 0, 13, 0, 0, 0, 235, 214, 196, 222, 255, 255, 255, 255])
-
-    #     # payload to inject
-    #     payload = bytes([0, 235, 214, 196, 222, 79, 174, 223, 164, 226, 32, 249, 38])
-    #     encrypted_payload = encrypt_payload(payload, self.master_key, self.iv)
-    #     packet = header + encrypted_payload
-
-    #     # update buffer
-    #     await self.injection_buffer.put(packet)
-    #     print(f"added to injection buffer {self.port}")
 
     
