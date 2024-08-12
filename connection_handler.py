@@ -152,10 +152,10 @@ class Connection:
 
     # async def inject_attack(self):     
     #     # header
-    #     header = bytes([84, 79, 90, 32, 32, 0, 0, 0, 255, 255, 255, 255, 0, 27, 0, 0, 0, 9, 206, 49, 105, 255, 255, 255, 255])
+    #     header = bytes([84, 79, 90, 32, 16, 0, 0, 0, 255, 255, 255, 255, 0, 13, 0, 0, 0, 235, 214, 196, 222, 255, 255, 255, 255])
 
     #     # payload to inject
-    #     payload = bytes([0, 9, 206, 49, 105, 130, 132, 172, 17, 1, 1, 0, 0, 0, 160, 95, 203, 57, 78, 185, 220, 8, 0, 0, 0, 0, 0])
+    #     payload = bytes([0, 235, 214, 196, 222, 79, 174, 223, 164, 226, 32, 249, 38])
     #     encrypted_payload = encrypt_payload(payload, self.master_key, self.iv)
     #     packet = header + encrypted_payload
 

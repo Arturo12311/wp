@@ -102,8 +102,8 @@ class Packet:
         _write(f"C:/al/logs/log_{timestamp}.log")
 
         # noname
-        if self.header_data["name"] == "unknown":
-            _write(f"C:/al/logs/unknown-name-packets.txt")
+        # if self.header_data["name"] == "unknown":
+        #     _write(f"C:/al/logs/unknown-name-packets.txt")
 
         # remainder
         # if self.payload_data["rest"] != []:
