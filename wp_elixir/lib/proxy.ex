@@ -23,6 +23,8 @@ defmodule Proxy do
     IO.puts("")
     IO.puts("CONNECTED TO SERVER")
     do_manage_convo(client, server)
+    IO.puts("")
+    IO.puts("CONVO DONE")
 
     # proxy.connect(server)
     # manage_convo(client, server, proxy)
@@ -41,54 +43,21 @@ defmodule Proxy do
   end
 
   def do_manage_convo(client, server) do
-    buffer = %{"send" => %{"open" => true, "buffer" =>[]}, "recv" => %{"open" => true, "buffer" =>[]}}
-    spawn(fn send_stream ->
-      case :gen_tcp.recv(client, 8192) do
-        {:ok, data} ->
-          buffer["recv"]["buffer"] += data
-          send_stream
-        {:ok, ""} ->
-          buffer["send"]["open"] = false
-      end
-    end)
-    spawn(fn recv_stream ->
-      case :gen_tcp.recv(server, 8192) do
-        {:ok, data} ->
-          buffer["recv"]["buffer"] += data
-          recv_stream
-        {:ok, ""} ->
-          buffer["recv"]["open"] = false
-      end
-    end)
-    spawn(fn sender ->
-
-    end)
-
-  def manage_stream(reader, writer) do
+    tasks = [
+      Task.async(fn -> do_manage_stream(client, server) end),
+      Task.async(fn -> do_manage_stream(server, client) end)
+    ]
+    Task.await_many(tasks, :infinity)
+    IO.puts("Both streams finished")
   end
 
-  def read_message(reader) do
-    case :gen_tcp.read(reader, 25) do
-      {:ok, ""} ->
-        break()
+  def do_manage_stream(reader, writer) do
+    case :gen_tcp.recv(reader, 0) do
       {:ok, data} ->
-        length = bytes.split(4:8) of data
-        :gen_tcp.read(reader, length)
-        {:ok data}
-    end
-  end
-  end
-  end
-
-  def stream(reader, writer) do
-    buffer = []
-    case :gen_tcp.recv(reader, 8192) do
-      {:ok, data} ->
-        buffer.add(data)
         :gen_tcp.send(writer, data)
-        stream(reader, writer)
-      {:error, _} ->
-        :gen_tcp.close(writer)
+        do_manage_stream(reader, writer)
+      {:error, :closed} ->
+        :ok
     end
   end
 end
